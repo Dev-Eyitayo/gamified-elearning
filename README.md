@@ -38,8 +38,7 @@ Ensure Docker is installed and running, then spin up the PostgreSQL instance. Cr
 # Start the database in detached mode
 docker-compose up -d
 
----
-
+```
 ### 2. Backend Setup (FastAPI + uv)
 The logic layer relies on FastAPI and uses `uv` for fast Python package management.
 
