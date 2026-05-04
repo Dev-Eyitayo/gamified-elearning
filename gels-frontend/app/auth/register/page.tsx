@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { Mail, Lock, User, ArrowRight, Phone, Shield } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 export default function RegisterPage() {
   const [formData, setFormData] = useState({
@@ -14,13 +15,15 @@ export default function RegisterPage() {
     role: 'learner'
   });
 
+  const router = useRouter();
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Submitting Registration:", formData);
+    router.push('/onboarding');
   };
 
   return (

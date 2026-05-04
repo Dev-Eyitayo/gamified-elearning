@@ -9,7 +9,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
   // If on the auth page, render without Sidebar and TopNav
-  if (pathname.startsWith("/auth")) {
+  if (pathname.startsWith("/auth") || pathname === "/onboarding" || pathname === "/lesson") {
     return <main className="min-h-screen bg-white">{children}</main>;
   }
 
