@@ -1,58 +1,38 @@
 "use client";
 
-import React, { useState } from 'react';
-import { Trophy, UserPlus, BrainCircuit, Target, CheckCheck, BellRing } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Trophy, UserPlus, BrainCircuit, Target, CheckCheck, BellRing, Loader2, AlertCircle } from 'lucide-react';
+import { api } from '@/api/api';
 
 export default function NotificationsPage() {
-  // Mock data for the notification feed
-  const [notifications, setNotifications] = useState([
-    { 
-      id: 1, 
-      type: 'achievement', 
-      title: 'League Promoted!', 
-      message: 'You advanced to the Obsidian League. Keep up the great work!', 
-      time: '2m ago', 
-      isRead: false 
-    },
-    { 
-      id: 2, 
-      type: 'social', 
-      title: 'Ade wale followed you', 
-      message: 'Follow them back to track each other\'s progress and celebrate wins together.', 
-      time: '1h ago', 
-      isRead: false 
-    },
-    { 
-      id: 3, 
-      type: 'ai', 
-      title: 'Path Adapted', 
-      message: 'The Cognitive Engine simplified Module 4.2 based on your recent quiz performance.', 
-      time: '3h ago', 
-      isRead: true 
-    },
-    { 
-      id: 4, 
-      type: 'quest', 
-      title: 'Daily Quest almost done', 
-      message: 'You just need 10 more XP to unlock the daily bronze chest.', 
-      time: '5h ago', 
-      isRead: true 
-    },
-    { 
-      id: 5, 
-      type: 'social', 
-      title: 'High Five! ✋', 
-      message: 'Sarah_Scripts celebrated your 30-day streak achievement.', 
-      time: '1d ago', 
-      isRead: true 
-    },
-  ]);
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    const fetchNotifs = async () => {
+      try {
+        const userId = localStorage.getItem('gels_user_id');
+        if (!userId) return;
+
+        const data = await api.gamification.getNotifications(userId);
+        setNotifications(data);
+      } catch (err: any) {
+        console.error("Failed to load notifications:", err);
+        setError("Failed to sync alerts.");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchNotifs();
+  }, []);
 
   const markAllAsRead = () => {
+    // In a real app, this would send a PUT request to the backend to update the DB
     setNotifications(notifications.map(n => ({ ...n, isRead: true })));
   };
 
-  // Helper to render the playful 3D icons based on notification type
   const renderIcon = (type: string) => {
     switch (type) {
       case 'achievement':
@@ -90,8 +70,29 @@ export default function NotificationsPage() {
 
   const unreadCount = notifications.filter(n => !n.isRead).length;
 
+  if (isLoading) {
+    return (
+      <div className="min-h-[80vh] flex flex-col items-center justify-center font-sans text-slate-400">
+        <Loader2 className="animate-spin mb-4 text-[#FF4B4B]" size={48} strokeWidth={3} />
+        <h2 className="font-black tracking-widest uppercase">Fetching Alerts...</h2>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-[80vh] flex flex-col items-center justify-center font-sans">
+        <div className="bg-[#FF4B4B]/10 text-[#FF4B4B] p-6 rounded-3xl border-2 border-[#FF4B4B]/20 flex flex-col items-center text-center max-w-md">
+          <AlertCircle size={48} strokeWidth={2.5} className="mb-4" />
+          <h2 className="font-black text-xl mb-2">Sync Error</h2>
+          <p className="font-bold">{error}</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="max-w-4xl mx-auto py-8 px-4 space-y-8">
+    <div className="max-w-4xl mx-auto py-8 px-4 space-y-8 animate-in fade-in duration-500">
       
       {/* Header Area */}
       <div className="border-b-4 border-slate-200 pb-6 flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">

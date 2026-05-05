@@ -5,6 +5,7 @@ from sqlalchemy.orm import relationship
 from datetime import datetime, timezone
 from core.database import Base
 import enum
+from datetime import datetime
 
 class UserRole(str, enum.Enum):
     learner = "learner"
@@ -110,3 +111,25 @@ class Quest(Base):
     reward_xp = Column(Integer, default=50)
     quest_type = Column(String(50), default="solo") # 'solo' or 'team'
     is_active = Column(Boolean, default=True)
+
+class Achievement(Base):
+    __tablename__ = "achievements"
+    
+    achievement_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    title = Column(String(255), nullable=False)
+    target_metric = Column(Integer, nullable=False) # e.g., 30000
+    metric_type = Column(String(50), nullable=False) # 'xp', 'streak', 'modules_completed'
+    icon = Column(String(50), default="Trophy")
+    color = Column(String(50), default="text-[#1CB0F6]")
+    bg = Column(String(50), default="bg-[#DDF4FF]")
+
+class Notification(Base):
+    __tablename__ = "notifications"
+    
+    notification_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.user_id"), nullable=False)
+    type = Column(String(50), nullable=False) # 'achievement', 'social', 'ai', 'quest'
+    title = Column(String(255), nullable=False)
+    message = Column(String, nullable=False)
+    is_read = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
