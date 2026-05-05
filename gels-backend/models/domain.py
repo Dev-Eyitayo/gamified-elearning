@@ -81,4 +81,32 @@ class DecisionLog(Base):
     rationale = Column(String, nullable=False)
     timestamp = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
-    user = relationship("User")
+
+class Course(Base):
+    __tablename__ = "courses"
+    
+    course_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    title = Column(String(255), nullable=False)
+    icon = Column(String(50), default="Book") # Matches Lucide icon names
+    color_class = Column(String(50), default="text-[#1CB0F6]")
+    bg_class = Column(String(50), default="bg-[#DDF4FF]")
+    border_class = Column(String(50), default="border-[#1CB0F6]")
+
+class DiagnosticQuestion(Base):
+    __tablename__ = "diagnostic_questions"
+    
+    question_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    course_id = Column(UUID(as_uuid=True), ForeignKey("courses.course_id"), nullable=False)
+    difficulty_level = Column(String(50), nullable=False) # 'beginner', 'intermediate', 'advanced'
+    question_text = Column(String, nullable=False)
+    options = Column(JSONB, nullable=False)
+
+class Quest(Base):
+    __tablename__ = "quests"
+    
+    quest_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    title = Column(String(255), nullable=False)
+    description = Column(String, nullable=False)
+    reward_xp = Column(Integer, default=50)
+    quest_type = Column(String(50), default="solo") # 'solo' or 'team'
+    is_active = Column(Boolean, default=True)

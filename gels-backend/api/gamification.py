@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
 from core.database import get_db
-from models.domain import LearnerProfile, User
+from models.domain import LearnerProfile, User, Quest
 
 router = APIRouter(prefix="/api/gamification", tags=["Affective Engine"])
 
@@ -47,4 +47,22 @@ def get_notifications():
     return [
         {"id": 1, "type": "achievement", "message": "You leveled up!", "read": False},
         {"id": 2, "type": "ai_adapted", "message": "Path simplified based on recent performance.", "read": True}
+    ]
+
+@router.get("/quests")
+def get_active_quests(db: Session = Depends(get_db)):
+    """PRD 4.2.2: Fetch active quests dynamically from the database"""
+    active_quests = db.query(Quest).filter(Quest.is_active == True).all()
+    
+    # Map them to the JSON structure the frontend expects
+    return [
+        {
+            "id": str(q.quest_id), 
+            "type": q.quest_type, 
+            "title": q.title, 
+            "description": q.description,
+            "reward_xp": q.reward_xp, 
+            "status": "active"
+        } 
+        for q in active_quests
     ]

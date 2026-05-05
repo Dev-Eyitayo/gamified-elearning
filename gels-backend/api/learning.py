@@ -6,6 +6,7 @@ from core.database import get_db
 from models.domain import EventLog, DecisionLog, Module, LearnerProfile, PlayerType
 from schemas.learning import AssessmentSubmit
 from services.ai_engine import run_edm_pipeline
+from models.domain import Course, DiagnosticQuestion
 
 router = APIRouter(prefix="/api/learning", tags=["Learning & Core Loop"])
 
@@ -70,3 +71,53 @@ def get_next_module(user_id: str, db: Session = Depends(get_db)):
     if not latest_decision:
         return {"action_taken": "ADVANCE", "rationale": "Starting default path."}
     return {"action_taken": latest_decision.action, "rationale": latest_decision.rationale}
+
+@router.get("/onboarding-config")
+def get_onboarding_config(db: Session = Depends(get_db)):
+    """Dynamically fetches Courses and Diagnostic Quizzes from the Database"""
+    
+    # 1. Fetch live courses from the DB
+    db_courses = db.query(Course).all()
+    courses_payload = [
+        {
+            "id": str(c.course_id), 
+            "title": c.title, 
+            "icon": c.icon, 
+            "colorClass": c.color_class, 
+            "bgClass": c.bg_class, 
+            "borderClass": c.border_class
+        } for c in db_courses
+    ]
+
+    # 2. Fetch live diagnostic questions and group them by difficulty
+    db_questions = db.query(DiagnosticQuestion).all()
+    quizzes_payload = {"beginner": [], "intermediate": [], "advanced": []}
+    
+    for q in db_questions:
+        level = q.difficulty_level.lower()
+        if level in quizzes_payload:
+            quizzes_payload[level].append({
+                "question": q.question_text,
+                "options": q.options
+            })
+
+    # 3. Return the dynamic payload
+    return {
+        "courses": courses_payload,
+        "levels": [
+            {"id": "beginner", "title": "Beginner", "description": "I'm completely new to this topic.", "icon": "Book", "bgHex": "bg-[#58CC02]"},
+            {"id": "intermediate", "title": "Intermediate", "description": "I know the basics and want to level up.", "icon": "Rocket", "bgHex": "bg-[#FF9600]"},
+            {"id": "advanced", "title": "Advanced", "description": "I have prior experience and want a challenge.", "icon": "Flame", "bgHex": "bg-[#FF4B4B]"}
+        ],
+        "diagnosticQuizzes": quizzes_payload,
+        "surveyQuestions": [
+            {
+                "question": "When you learn something new, you prefer to:",
+                "options": [
+                    {"id": "ACHIEVER", "text": "Master it completely and get a high score", "icon": "Trophy", "color": "text-[#FFD900]"},
+                    {"id": "SOCIALIZER", "text": "Discuss it and solve problems with peers", "icon": "Users", "color": "text-[#1CB0F6]"},
+                    {"id": "EXPLORER", "text": "Explore related topics and hidden concepts", "icon": "Compass", "color": "text-[#CE82FF]"}
+                ]
+            }
+        ]
+    }
