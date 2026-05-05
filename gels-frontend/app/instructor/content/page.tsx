@@ -1,5 +1,6 @@
 import React from 'react';
 import { Plus, FileText, Settings2, MoreHorizontal } from 'lucide-react';
+import Link from 'next/link';
 
 export default function ContentManagementPage() {
   const modules = [
@@ -15,9 +16,9 @@ export default function ContentManagementPage() {
           <h1 className="text-3xl font-black text-slate-700 uppercase tracking-tight">Curriculum Base</h1>
           <p className="text-slate-500 font-bold mt-1">Upload structured modules for AI sequencing.</p>
         </div>
-        <button className="bg-[#58CC02] text-white px-6 py-3.5 rounded-2xl font-black uppercase tracking-widest transition-all border-b-4 border-[#46A302] hover:bg-[#46A302] active:translate-y-1 active:border-b-0 flex items-center gap-2 shadow-sm">
-          <Plus size={20} strokeWidth={3} /> Upload Module
-        </button>
+        <Link href="/instructor/content/new"className="bg-[#58CC02] text-white px-6 py-3.5 rounded-2xl font-black uppercase tracking-widest transition-all border-b-4 border-[#46A302] hover:bg-[#46A302] active:translate-y-1 active:border-b-0 flex items-center gap-2 shadow-sm">
+            <Plus size={20} strokeWidth={3} /> Upload Module
+        </Link>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
