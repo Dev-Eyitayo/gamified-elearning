@@ -1,28 +1,50 @@
-import React from 'react';
-import { AlertCircle, Edit3, Search, TrendingUp, TrendingDown } from 'lucide-react';
+"use client";
+
+import React, { useState, useEffect } from 'react';
+import { AlertCircle, Edit3, Search, TrendingUp, TrendingDown, Loader2 } from 'lucide-react';
+import { api } from '@/api/api';
 
 export default function StudentsPage() {
-  const students = [
-    { id: 1, name: "Chidera Eze", mastery: 45, risk: "HIGH", streak: 2, profile: "ACHIEVER" },
-    { id: 2, name: "Aisha Mohammed", mastery: 92, risk: "LOW", streak: 15, profile: "EXPLORER" },
-    { id: 3, name: "Emeka Okafor", mastery: 78, risk: "MEDIUM", streak: 5, profile: "SOCIALIZER" },
-  ];
+  const [students, setStudents] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchStudents = async () => {
+      try {
+        const data = await api.instructor.getRoster();
+        setStudents(data);
+      } catch (err) {
+        console.error("Failed to load roster", err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchStudents();
+  }, []);
+
+  const handleOverride = async (studentId: string, studentName: string) => {
+    const reason = prompt(`Enter reason for manually overriding AI path for ${studentName}:`);
+    if (reason) {
+      await api.instructor.overridePath({ student_id: studentId, module_id: "manual", reason });
+      alert("Override logged to the AI Decision Engine.");
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="py-20 flex flex-col items-center justify-center text-slate-400">
+        <Loader2 className="animate-spin mb-4 text-[#1CB0F6]" size={48} strokeWidth={3} />
+        <h2 className="font-black tracking-widest uppercase">Fetching Roster...</h2>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 animate-in fade-in duration-500">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-3xl font-black text-slate-700 uppercase tracking-tight">Cohort Roster</h1>
           <p className="text-slate-500 font-bold mt-1">Monitor progress and execute manual overrides.</p>
-        </div>
-        
-        <div className="relative w-full sm:w-auto group">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#1CB0F6] transition-colors" size={20} strokeWidth={3} />
-          <input 
-            type="text" 
-            placeholder="Search roster..." 
-            className="w-full sm:w-64 bg-slate-100 border-2 border-slate-200 rounded-2xl pl-12 pr-4 py-3 text-sm font-bold text-slate-700 focus:outline-none focus:border-[#1CB0F6] transition-all" 
-          />
         </div>
       </div>
 
@@ -32,13 +54,17 @@ export default function StudentsPage() {
             <thead>
               <tr className="bg-slate-50 border-b-2 border-slate-200">
                 <th className="px-6 py-5 font-black text-slate-500 uppercase tracking-widest">Learner</th>
-                <th className="px-6 py-5 font-black text-slate-500 uppercase tracking-widest">Mastery</th>
+                <th className="px-6 py-5 font-black text-slate-500 uppercase tracking-widest">Mastery Estimate</th>
                 <th className="px-6 py-5 font-black text-slate-500 uppercase tracking-widest">Player Type</th>
                 <th className="px-6 py-5 font-black text-slate-500 uppercase tracking-widest text-center">Intervention</th>
               </tr>
             </thead>
             <tbody className="divide-y-2 divide-slate-100">
-              {students.map((student) => (
+              {students.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="text-center py-10 font-bold text-slate-400">No students found in the database.</td>
+                </tr>
+              ) : students.map((student) => (
                 <tr key={student.id} className="hover:bg-slate-50 transition-colors">
                   <td className="px-6 py-5">
                     <div className="flex items-center gap-4">
@@ -62,7 +88,7 @@ export default function StudentsPage() {
                     </span>
                   </td>
                   <td className="px-6 py-5 text-center">
-                    <button className="inline-flex bg-[#1CB0F6]/10 text-[#1CB0F6] px-4 py-2 rounded-xl font-black uppercase tracking-widest border-2 border-[#1CB0F6]/20 hover:bg-[#1CB0F6] hover:text-white transition-all items-center gap-2">
+                    <button onClick={() => handleOverride(student.id, student.name)} className="inline-flex bg-[#1CB0F6]/10 text-[#1CB0F6] px-4 py-2 rounded-xl font-black uppercase tracking-widest border-2 border-[#1CB0F6]/20 hover:bg-[#1CB0F6] hover:text-white transition-all items-center gap-2">
                       <Edit3 size={16} strokeWidth={3} /> Override
                     </button>
                   </td>

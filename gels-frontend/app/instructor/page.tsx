@@ -1,157 +1,273 @@
-import React from 'react';
-import { Users, AlertCircle, Activity, BrainCircuit, Search, ChevronRight, Edit3, ShieldAlert } from 'lucide-react';
-import StatCard from '@/components/dashboard/StatCard';
+"use client";
+
+import React, { useState, useEffect } from 'react';
+import { BrainCircuit, ShieldAlert, Activity, Users, Loader2, AlertCircle, ArrowUpRight, RotateCcw, Database, PlusCircle, CheckCircle2 } from 'lucide-react';
+import { api } from '@/api/api';
 
 export default function InstructorDashboard() {
-  const cohortStats = { totalStudents: 48, avgMastery: "72%", atRiskCount: 4, activeOverrides: 2 };
+  const [activeTab, setActiveTab] = useState<'analytics' | 'content'>('analytics');
+  
+  // Data States
+  const [analytics, setAnalytics] = useState<any>(null);
+  const [logs, setLogs] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
 
-  const decisionLog = [
-    {
-      id: "log-1", student: "Chidera Eze", timestamp: "10 mins ago", topic: "Recursion", action: "REMEDIATE",
-      rationale: "knowledge_state for 'recursion' = 0.28 (below 0.70). Scored 40% on Module 12 (4 attempts). Engagement = 0.35. Inserted foundational module before Module 13."
-    },
-    {
-      id: "log-2", student: "Aisha Mohammed", timestamp: "1 hour ago", topic: "Graphs", action: "ESCALATE",
-      rationale: "time_on_task << estimated_minutes AND score > 0.9. Learner is bored. Increased difficulty by one level."
+  // Form States
+  const [questForm, setQuestForm] = useState({ title: '', description: '', reward_xp: 50, quest_type: 'solo' });
+  const [moduleForm, setModuleForm] = useState({ title: '', name: '', topic_id: '', difficulty: 'EASY', content_url: 'https://', estimated_minutes: 15 });
+
+  const fetchDashboardData = async () => {
+    setIsLoading(true);
+    try {
+      // Fetch both Analytics and Logs concurrently
+      const [analyticsData, logsData] = await Promise.all([
+        api.instructor.getAnalytics(),
+        api.instructor.getLogs()
+      ]);
+      setAnalytics(analyticsData);
+      setLogs(logsData);
+      setError('');
+    } catch (err: any) {
+      console.error("Failed to load dashboard:", err);
+      setError("Failed to connect to the Cognitive Engine.");
+    } finally {
+      setIsLoading(false);
     }
-  ];
+  };
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
+
+  const handleAddQuest = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await api.instructor.addQuest(questForm);
+      setSuccessMsg(`Quest "${questForm.title}" added to database!`);
+      setQuestForm({ title: '', description: '', reward_xp: 50, quest_type: 'solo' });
+      setTimeout(() => setSuccessMsg(''), 3000);
+    } catch (err) {
+      setError("Failed to add Quest.");
+    }
+  };
+
+  const handleAddModule = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await api.instructor.addModule(moduleForm);
+      setSuccessMsg(`Module "${moduleForm.name}" added to database!`);
+      setModuleForm({ title: '', name: '', topic_id: '', difficulty: 'EASY', content_url: 'https://', estimated_minutes: 15 });
+      setTimeout(() => setSuccessMsg(''), 3000);
+    } catch (err) {
+      setError("Failed to add Module.");
+    }
+  };
+
+  const getActionBadge = (action: string) => {
+    switch (action) {
+      case 'ADVANCE':
+        return <span className="bg-[#58CC02]/10 text-[#58CC02] border-2 border-[#58CC02]/20 px-3 py-1 rounded-xl text-xs font-black tracking-widest uppercase flex items-center gap-1 w-fit"><ArrowUpRight size={14} strokeWidth={3}/> {action}</span>;
+      case 'REMEDIATE':
+        return <span className="bg-[#FF9600]/10 text-[#FF9600] border-2 border-[#FF9600]/20 px-3 py-1 rounded-xl text-xs font-black tracking-widest uppercase flex items-center gap-1 w-fit"><RotateCcw size={14} strokeWidth={3}/> {action}</span>;
+      default:
+        return <span className="bg-slate-100 text-slate-500 border-2 border-slate-200 px-3 py-1 rounded-xl text-xs font-black tracking-widest uppercase w-fit">{action}</span>;
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-[80vh] flex flex-col items-center justify-center font-sans text-slate-400">
+        <Loader2 className="animate-spin mb-4 text-[#CE82FF]" size={48} strokeWidth={3} />
+        <h2 className="font-black tracking-widest uppercase">Syncing Instructor Portal...</h2>
+      </div>
+    );
+  }
 
   return (
-    <div className="max-w-7xl mx-auto space-y-10 py-4 px-4">
+    <div className="max-w-6xl mx-auto py-8 px-4 space-y-8 animate-in fade-in duration-500">
       
-      {/* Header */}
-      <div className="border-b-4 border-slate-200 pb-6 flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
+      {/* Header & Tabs */}
+      <div className="border-b-4 border-slate-200 pb-6 flex flex-col md:flex-row md:justify-between md:items-end gap-4">
         <div>
-          <h1 className="text-4xl font-black text-slate-700 uppercase tracking-tight">Cohort 400L</h1>
-          <p className="text-slate-500 font-bold mt-2 text-lg">Glass-Box AI Monitoring & Overrides</p>
-        </div>
-        <div className="bg-[#CE82FF] px-4 py-2 rounded-2xl border-b-4 border-[#A568CC] text-white font-black uppercase tracking-widest text-sm flex items-center gap-2">
-          <BrainCircuit size={20} strokeWidth={3} /> AI Active
-        </div>
-      </div>
-
-      {/* 1. Stat Cards Row */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard 
-          title="Avg. Mastery" 
-          value={cohortStats.avgMastery} 
-          icon={<Activity size={32} strokeWidth={3} />} 
-          iconColorClass="text-[#1CB0F6]" iconBgClass="bg-[#1CB0F6]/10" borderColorClass="border-[#1CB0F6]/20" 
-        />
-        <StatCard 
-          title="Total Active" 
-          value={cohortStats.totalStudents} 
-          icon={<Users size={32} strokeWidth={3} />} 
-          iconColorClass="text-[#CE82FF]" iconBgClass="bg-[#CE82FF]/10" borderColorClass="border-[#CE82FF]/20" 
-        />
-        <StatCard 
-          title="At-Risk" 
-          value={cohortStats.atRiskCount} 
-          subtext={<span className="text-[#FF4B4B]">High drop-off risk</span>} 
-          icon={<AlertCircle size={32} strokeWidth={3} />} 
-          iconColorClass="text-[#FF4B4B]" iconBgClass="bg-[#FF4B4B]/10" borderColorClass="border-[#FF4B4B]/20" 
-        />
-        <StatCard 
-          title="Overrides" 
-          value={cohortStats.activeOverrides} 
-          icon={<ShieldAlert size={32} strokeWidth={3} />} 
-          iconColorClass="text-[#FF9600]" iconBgClass="bg-[#FF9600]/10" borderColorClass="border-[#FF9600]/20" 
-        />
-      </div>
-
-      {/* 2. AI Decision Log Panel */}
-      <div className="flex flex-col space-y-6">
-        
-        {/* Panel Header & Search */}
-        <div className="flex flex-col sm:flex-row justify-between items-center gap-4 bg-white border-2 border-slate-200 rounded-3xl p-6 shadow-[0_6px_0_0_#E5E5E5]">
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-[#1CB0F6]/10 rounded-2xl border-2 border-[#1CB0F6]/20 text-[#1CB0F6]">
-              <BrainCircuit size={28} strokeWidth={3} />
-            </div>
-            <div>
-              <h2 className="text-xl font-black text-slate-700 uppercase tracking-widest">Decision Log</h2>
-              <p className="text-sm font-bold text-slate-400">Real-time pedagogical actions taken by Gemini 1.5</p>
-            </div>
-          </div>
-          
-          <div className="relative w-full sm:w-auto group">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#1CB0F6] transition-colors" size={20} strokeWidth={3} />
-            <input 
-              type="text" 
-              placeholder="Search student..." 
-              className="w-full sm:w-72 bg-slate-100 border-2 border-slate-200 rounded-2xl pl-12 pr-4 py-3 text-sm font-bold text-slate-700 focus:outline-none focus:border-[#1CB0F6] focus:bg-white transition-all placeholder-slate-400" 
-            />
-          </div>
+          <h1 className="text-4xl font-black text-slate-700 uppercase tracking-tight flex items-center gap-3">
+            <BrainCircuit size={40} className="text-[#CE82FF]" strokeWidth={2.5} /> Control Center
+          </h1>
+          <p className="text-slate-500 font-bold mt-2 text-lg">Manage content and monitor AI decisions</p>
         </div>
         
-        {/* The Logs */}
-        <div className="space-y-6">
-          {decisionLog.map((log) => (
-            <div key={log.id} className="bg-white border-2 border-slate-200 rounded-3xl p-6 md:p-8 shadow-[0_6px_0_0_#E5E5E5] flex flex-col xl:flex-row gap-8 transition-all hover:-translate-y-1">
-              
-              {/* Left Column: Log Details */}
-              <div className="flex-1 space-y-6">
-                
-                {/* Header info */}
-                <div className="flex flex-wrap items-center gap-4">
-                  <div className="w-12 h-12 rounded-full bg-[#1CB0F6] flex items-center justify-center font-black text-white text-xl border-b-4 border-[#1899D6]">
-                    {log.student.charAt(0)}
-                  </div>
-                  <div>
-                    <h3 className="font-black text-slate-700 text-xl">{log.student}</h3>
-                    <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">{log.timestamp}</p>
-                  </div>
-                </div>
-
-                {/* Tags */}
-                <div className="flex flex-wrap items-center gap-3">
-                  <span className="bg-slate-100 text-slate-500 text-xs px-3 py-1.5 rounded-xl font-black uppercase tracking-widest border-2 border-slate-200">
-                    Topic: {log.topic}
-                  </span>
-                  <span className={`text-xs px-3 py-1.5 rounded-xl font-black uppercase tracking-widest border-2 ${
-                    log.action === 'REMEDIATE' 
-                      ? 'bg-[#FF4B4B]/10 text-[#FF4B4B] border-[#FF4B4B]/20' 
-                      : 'bg-[#58CC02]/10 text-[#58CC02] border-[#58CC02]/20'
-                  }`}>
-                    Action: {log.action}
-                  </span>
-                </div>
-
-                {/* Glass-Box Rationale (The "Why") */}
-                <div className="bg-[#DDF4FF] p-5 rounded-2xl border-2 border-[#1CB0F6]/30 relative overflow-hidden">
-                  <BrainCircuit size={100} strokeWidth={1} className="absolute -right-4 -bottom-4 text-[#1CB0F6]/10 pointer-events-none" />
-                  <p className="text-xs font-black text-[#1CB0F6] mb-2 uppercase tracking-widest">System Rationale:</p>
-                  <p className="text-slate-700 font-bold leading-relaxed relative z-10">
-                    {log.rationale}
-                  </p>
-                </div>
-              </div>
-
-              {/* Right Column: Interventions */}
-              <div className="w-full xl:w-72 flex flex-col gap-3 justify-center border-t-2 xl:border-t-0 xl:border-l-2 border-slate-100 pt-6 xl:pt-0 xl:pl-8">
-                <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2 text-center xl:text-left">
-                  Available Interventions
-                </p>
-                
-                {/* 3D Action Buttons */}
-                <button className="w-full bg-[#1CB0F6] text-white py-3.5 px-5 rounded-2xl text-sm font-black uppercase tracking-widest transition-all border-b-4 border-[#1899D6] hover:bg-[#149FDF] active:translate-y-1 active:border-b-0 flex items-center justify-between">
-                  Override Path <Edit3 size={20} strokeWidth={3} />
-                </button>
-                
-                <button className="w-full bg-white border-2 border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-600 py-3.5 px-5 rounded-2xl text-sm font-black uppercase tracking-widest transition-all active:translate-y-1 flex items-center justify-between shadow-[0_4px_0_0_#E5E5E5] active:shadow-none mb-1">
-                  Mark Understood <ChevronRight size={20} strokeWidth={3} />
-                </button>
-                
-                <button className="w-full bg-white border-2 border-[#FF4B4B]/20 text-[#FF4B4B] hover:bg-[#FF4B4B]/5 py-3.5 px-5 rounded-2xl text-sm font-black uppercase tracking-widest transition-all active:translate-y-1 flex items-center justify-between shadow-[0_4px_0_0_rgba(255,75,75,0.2)] active:shadow-none">
-                  Flag for Review <AlertCircle size={20} strokeWidth={3} />
-                </button>
-              </div>
-
-            </div>
-          ))}
+        <div className="flex bg-slate-100 p-1 rounded-2xl border-2 border-slate-200">
+          <button 
+            onClick={() => setActiveTab('analytics')}
+            className={`px-6 py-3 rounded-xl font-black uppercase tracking-widest text-sm transition-all ${activeTab === 'analytics' ? 'bg-white text-[#1CB0F6] shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+          >
+            Analytics & Logs
+          </button>
+          <button 
+            onClick={() => setActiveTab('content')}
+            className={`px-6 py-3 rounded-xl font-black uppercase tracking-widest text-sm transition-all ${activeTab === 'content' ? 'bg-white text-[#CE82FF] shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+          >
+            Content Manager
+          </button>
         </div>
       </div>
+
+      {error && (
+        <div className="bg-[#FF4B4B]/10 text-[#FF4B4B] p-4 rounded-2xl border-2 border-[#FF4B4B]/20 flex items-center gap-3">
+          <AlertCircle size={24} strokeWidth={2.5} />
+          <p className="font-bold">{error}</p>
+        </div>
+      )}
       
+      {successMsg && (
+        <div className="bg-[#58CC02]/10 text-[#58CC02] p-4 rounded-2xl border-2 border-[#58CC02]/20 flex items-center gap-3">
+          <CheckCircle2 size={24} strokeWidth={2.5} />
+          <p className="font-bold">{successMsg}</p>
+        </div>
+      )}
+
+      {/* TAB 1: ANALYTICS & LOGS */}
+      {activeTab === 'analytics' && (
+        <div className="space-y-8">
+          {/* Top Level Metrics (DYNAMIC) */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="bg-white border-2 border-slate-200 p-5 rounded-3xl shadow-[0_4px_0_0_#E5E5E5]">
+              <p className="text-slate-400 font-black uppercase tracking-widest text-xs mb-1">Total Students</p>
+              <p className="text-3xl font-black text-slate-700">{analytics?.total_active || 0}</p>
+            </div>
+            <div className="bg-white border-2 border-slate-200 p-5 rounded-3xl shadow-[0_4px_0_0_#E5E5E5]">
+              <p className="text-slate-400 font-black uppercase tracking-widest text-xs mb-1">Avg Mastery</p>
+              <p className="text-3xl font-black text-[#1CB0F6]">{analytics?.avg_mastery_estimate || "0%"}</p>
+            </div>
+            <div className="bg-white border-2 border-[#FF4B4B]/30 p-5 rounded-3xl shadow-[0_4px_0_0_#FF4B4B]/20 bg-[#FF4B4B]/5">
+              <p className="text-[#FF4B4B]/70 font-black uppercase tracking-widest text-xs mb-1">At Risk</p>
+              <p className="text-3xl font-black text-[#FF4B4B]">{analytics?.at_risk_count || 0}</p>
+            </div>
+            <div className="bg-white border-2 border-slate-200 p-5 rounded-3xl shadow-[0_4px_0_0_#E5E5E5]">
+              <p className="text-slate-400 font-black uppercase tracking-widest text-xs mb-1">Drop Off Rate</p>
+              <p className="text-3xl font-black text-slate-700">{analytics?.drop_off_rate || 0}</p>
+            </div>
+          </div>
+
+          {/* AI Decision Log (DYNAMIC) */}
+          <div className="bg-white border-2 border-slate-200 rounded-3xl overflow-hidden shadow-sm">
+            <div className="p-6 border-b-2 border-slate-100 bg-slate-50 flex justify-between items-center">
+              <div className="flex items-center gap-3">
+                <ShieldAlert size={24} className="text-slate-400" strokeWidth={2.5} />
+                <h2 className="font-black text-slate-600 uppercase tracking-widest text-sm">Glass-Box AI Log</h2>
+              </div>
+              <button onClick={fetchDashboardData} className="text-[#1CB0F6] font-bold text-sm uppercase tracking-widest hover:underline">Refresh</button>
+            </div>
+            
+            <div className="divide-y-2 divide-slate-100">
+              {logs.length === 0 ? (
+                <div className="p-12 text-center text-slate-400 font-bold">
+                  No AI decisions logged yet. Students need to take a lesson!
+                </div>
+              ) : (
+                logs.map((log, idx) => (
+                  <div key={idx} className="p-6 flex flex-col md:flex-row md:items-center gap-6 hover:bg-slate-50 transition-colors">
+                    <div className="w-full md:w-48 shrink-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Users size={16} className="text-slate-400" strokeWidth={3} />
+                        <span className="font-black text-slate-700 truncate">{log.user_id.substring(0,8)}...</span>
+                      </div>
+                      <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">
+                        {new Date(log.time).toLocaleTimeString()}
+                      </span>
+                    </div>
+                    <div className="w-40 shrink-0">{getActionBadge(log.action)}</div>
+                    <div className="flex-1 bg-[#DDF4FF]/50 border-2 border-[#1CB0F6]/20 p-4 rounded-2xl flex items-start gap-3">
+                      <Activity size={20} className="text-[#1CB0F6] shrink-0 mt-0.5" strokeWidth={3} />
+                      <p className="font-bold text-slate-600 text-sm leading-relaxed">
+                        <span className="text-[#1CB0F6] uppercase tracking-wider font-black mr-2 text-xs">AI Rationale:</span>
+                        {log.rationale}
+                      </p>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 2: CONTENT MANAGER */}
+      {activeTab === 'content' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          
+          {/* Add Module Form */}
+          <div className="bg-white border-2 border-slate-200 rounded-3xl p-6 shadow-sm">
+            <div className="flex items-center gap-3 mb-6">
+              <Database size={24} className="text-[#CE82FF]" strokeWidth={2.5} />
+              <h2 className="font-black text-slate-700 uppercase tracking-widest text-lg">Add Module</h2>
+            </div>
+            <form onSubmit={handleAddModule} className="space-y-4">
+              <div>
+                <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Unit Title (e.g. Unit 1)</label>
+                <input required type="text" value={moduleForm.title} onChange={e => setModuleForm({...moduleForm, title: e.target.value})} className="w-full mt-1 border-2 border-slate-200 p-3 rounded-xl font-bold text-slate-700 focus:border-[#CE82FF] outline-none" />
+              </div>
+              <div>
+                <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Module Name</label>
+                <input required type="text" value={moduleForm.name} onChange={e => setModuleForm({...moduleForm, name: e.target.value})} className="w-full mt-1 border-2 border-slate-200 p-3 rounded-xl font-bold text-slate-700 focus:border-[#CE82FF] outline-none" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Difficulty</label>
+                  <select value={moduleForm.difficulty} onChange={e => setModuleForm({...moduleForm, difficulty: e.target.value})} className="w-full mt-1 border-2 border-slate-200 p-3 rounded-xl font-bold text-slate-700 focus:border-[#CE82FF] outline-none bg-white">
+                    <option value="EASY">EASY</option>
+                    <option value="MEDIUM">MEDIUM</option>
+                    <option value="HARD">HARD</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Est. Mins</label>
+                  <input required type="number" value={moduleForm.estimated_minutes} onChange={e => setModuleForm({...moduleForm, estimated_minutes: parseInt(e.target.value)})} className="w-full mt-1 border-2 border-slate-200 p-3 rounded-xl font-bold text-slate-700 focus:border-[#CE82FF] outline-none" />
+                </div>
+              </div>
+              <button type="submit" className="w-full mt-4 bg-[#CE82FF] text-white font-black uppercase tracking-widest py-4 rounded-xl border-b-4 border-[#A568CC] active:border-b-0 active:translate-y-1 flex justify-center items-center gap-2">
+                <PlusCircle size={20} strokeWidth={3} /> Save Module
+              </button>
+            </form>
+          </div>
+
+          {/* Add Quest Form */}
+          <div className="bg-white border-2 border-slate-200 rounded-3xl p-6 shadow-sm h-fit">
+            <div className="flex items-center gap-3 mb-6">
+              <Database size={24} className="text-[#FF9600]" strokeWidth={2.5} />
+              <h2 className="font-black text-slate-700 uppercase tracking-widest text-lg">Add Quest</h2>
+            </div>
+            <form onSubmit={handleAddQuest} className="space-y-4">
+              <div>
+                <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Quest Title</label>
+                <input required type="text" value={questForm.title} onChange={e => setQuestForm({...questForm, title: e.target.value})} className="w-full mt-1 border-2 border-slate-200 p-3 rounded-xl font-bold text-slate-700 focus:border-[#FF9600] outline-none" />
+              </div>
+              <div>
+                <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Description</label>
+                <input required type="text" value={questForm.description} onChange={e => setQuestForm({...questForm, description: e.target.value})} className="w-full mt-1 border-2 border-slate-200 p-3 rounded-xl font-bold text-slate-700 focus:border-[#FF9600] outline-none" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Type</label>
+                  <select value={questForm.quest_type} onChange={e => setQuestForm({...questForm, quest_type: e.target.value})} className="w-full mt-1 border-2 border-slate-200 p-3 rounded-xl font-bold text-slate-700 focus:border-[#FF9600] outline-none bg-white">
+                    <option value="solo">Solo</option>
+                    <option value="team">Team</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-black text-slate-400 uppercase tracking-widest">XP Reward</label>
+                  <input required type="number" value={questForm.reward_xp} onChange={e => setQuestForm({...questForm, reward_xp: parseInt(e.target.value)})} className="w-full mt-1 border-2 border-slate-200 p-3 rounded-xl font-bold text-slate-700 focus:border-[#FF9600] outline-none" />
+                </div>
+              </div>
+              <button type="submit" className="w-full mt-4 bg-[#FF9600] text-white font-black uppercase tracking-widest py-4 rounded-xl border-b-4 border-[#D97A00] active:border-b-0 active:translate-y-1 flex justify-center items-center gap-2">
+                <PlusCircle size={20} strokeWidth={3} /> Save Quest
+              </button>
+            </form>
+          </div>
+
+        </div>
+      )}
     </div>
   );
 }

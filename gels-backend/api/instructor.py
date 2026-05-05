@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.sql import func
 from pydantic import BaseModel
 from core.database import get_db
-from models.domain import LearnerProfile, DecisionLog, Module, Difficulty
+from models.domain import LearnerProfile, DecisionLog, Module, Difficulty, User
 
 router = APIRouter(prefix="/api/instructor", tags=["Instructor Glass-Box Portal"])
 
@@ -127,3 +127,27 @@ def create_quest(data: QuestCreate, db: Session = Depends(get_db)):
     db.add(new_quest)
     db.commit()
     return {"success": True, "quest_id": str(new_quest.quest_id)}
+
+@router.get("/roster")
+def get_cohort_roster(db: Session = Depends(get_db)):
+    """Fetches all students and their live gamification/learning stats"""
+    students = db.query(User.email, LearnerProfile).join(LearnerProfile, User.user_id == LearnerProfile.user_id).all()
+    
+    roster = []
+    for email, profile in students:
+        # Calculate a rough mastery percentage based on XP for the MVP
+        mastery = min(100, int((profile.xp_total / 10000) * 100)) if profile.xp_total else 0
+        
+        # Determine risk based on the Affective Engine's engagement score
+        risk = "HIGH" if profile.engagement_score < 0.4 else "MEDIUM" if profile.engagement_score < 0.7 else "LOW"
+        
+        roster.append({
+            "id": str(profile.user_id),
+            "name": email.split('@')[0].replace('.', ' ').title(),
+            "mastery": mastery,
+            "risk": risk,
+            "streak": profile.streak_days,
+            "profile": profile.player_type.value
+        })
+        
+    return roster

@@ -1,8 +1,16 @@
-import React from 'react';
-import { Zap, Clock, Target, Gift, Clock4, Calendar } from 'lucide-react';
+"use client";
+
+import React, { useState, useEffect } from 'react';
+import { Zap, Clock, Target, Gift, Clock4, Calendar, Loader2, AlertCircle } from 'lucide-react';
+import { api } from '@/api/api';
 
 export default function QuestsPage() {
-  // Mock Data mapped to the screenshot
+  // Dynamic State for Daily Quests
+  const [dailyQuests, setDailyQuests] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  // Static Mock Data for Monthly mechanics (MVP)
   const monthlyQuest = {
     month: "MAY",
     title: "May Quest",
@@ -12,12 +20,6 @@ export default function QuestsPage() {
     total: 35
   };
 
-  const dailyQuests = [
-    { id: 1, title: "Earn 10 XP", current: 10, total: 10, icon: <Zap size={32} className="text-[#FFD900]" fill="currentColor" />, isDone: true },
-    { id: 2, title: "Get 5 in a row correct in 2 modules", current: 1, total: 2, icon: <Target size={32} className="text-[#58CC02]" fill="currentColor" />, isDone: false },
-    { id: 3, title: "Spend 10 minutes learning", current: 1, total: 10, icon: <Clock size={32} className="text-[#1CB0F6]" fill="currentColor" />, isDone: false },
-  ];
-
   const monthlyBadges = [
     { id: 1, title: "February Quest", date: "February 2026", color: "bg-[#58CC02]" },
     { id: 2, title: "January Quest", date: "January 2026", color: "bg-[#1CB0F6]" },
@@ -25,13 +27,51 @@ export default function QuestsPage() {
     { id: 4, title: "Duocon 2025", date: "September 2025", color: "bg-[#FF9600]" },
   ];
 
+  // Fetch real quests from the backend on mount
+  useEffect(() => {
+    const fetchQuests = async () => {
+      try {
+        const data = await api.gamification.getQuests();
+        setDailyQuests(data);
+      } catch (err: any) {
+        console.error("Failed to load quests:", err);
+        setError("Failed to sync quests from the Affective Engine.");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchQuests();
+  }, []);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-[80vh] flex flex-col items-center justify-center font-sans text-slate-400">
+        <Loader2 className="animate-spin mb-4 text-[#FF9600]" size={48} strokeWidth={3} />
+        <h2 className="font-black tracking-widest uppercase">Loading Quests...</h2>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-[80vh] flex flex-col items-center justify-center font-sans">
+        <div className="bg-[#FF4B4B]/10 text-[#FF4B4B] p-6 rounded-3xl border-2 border-[#FF4B4B]/20 flex flex-col items-center text-center max-w-md">
+          <AlertCircle size={48} strokeWidth={2.5} className="mb-4" />
+          <h2 className="font-black text-xl mb-2">Quest Error</h2>
+          <p className="font-bold">{error}</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="max-w-6xl mx-auto flex flex-col lg:flex-row gap-8 py-8 px-4">
+    <div className="max-w-6xl mx-auto flex flex-col lg:flex-row gap-8 py-8 px-4 animate-in fade-in duration-500">
       
       {/* LEFT COLUMN: The Quests */}
       <div className="flex-1 space-y-8">
         
-        {/* Massive Monthly Quest Block */}
+        {/* Massive Monthly Quest Block (Static UI) */}
         <div className="bg-[#FF66AA] rounded-3xl p-6 shadow-[0_6px_0_0_#D94482]">
           <div className="bg-white/20 w-fit px-3 py-1 rounded-xl mb-4">
             <span className="text-white font-black uppercase tracking-widest text-sm">{monthlyQuest.month}</span>
@@ -56,7 +96,7 @@ export default function QuestsPage() {
           </div>
         </div>
 
-        {/* Daily Quests List */}
+        {/* Daily Quests List (DYNAMIC) */}
         <div>
           <div className="flex justify-between items-end mb-4 px-2">
             <h2 className="text-2xl font-black text-slate-700">Daily Quests</h2>
@@ -65,43 +105,67 @@ export default function QuestsPage() {
             </span>
           </div>
 
-          <div className="border-2 border-slate-200 rounded-3xl bg-white shadow-[0_6px_0_0_#E5E5E5] divide-y-2 divide-slate-100">
-            {dailyQuests.map((quest) => (
-              <div key={quest.id} className="p-6 flex items-center gap-6">
-                {/* Quest Icon */}
-                <div className="shrink-0">
-                  {quest.icon}
-                </div>
-
-                {/* Quest Details & Progress */}
-                <div className="flex-1">
-                  <h3 className="font-black text-slate-700 text-lg mb-3">{quest.title}</h3>
-                  <div className="flex items-center gap-4">
-                    <div className="relative flex-1 h-5 bg-slate-200 rounded-full overflow-hidden">
-                      <div 
-                        className={`absolute top-0 left-0 h-full rounded-full transition-all ${quest.isDone ? 'bg-[#FFD900]' : 'bg-[#FFD900]'}`}
-                        style={{ width: `${(quest.current / quest.total) * 100}%` }}
-                      ></div>
-                      <span className="absolute w-full top-0.5 text-center text-[10px] font-black text-yellow-900 tracking-widest z-10">
-                        {quest.current} / {quest.total}
-                      </span>
-                    </div>
-                    {/* Chest Icon */}
-                    <Gift 
-                      size={28} 
-                      strokeWidth={2.5} 
-                      className={quest.isDone ? "text-[#FF9600]" : "text-slate-300"} 
-                      fill={quest.isDone ? "#FFD900" : "transparent"} 
-                    />
-                  </div>
-                </div>
+          <div className="border-2 border-slate-200 rounded-3xl bg-white shadow-[0_6px_0_0_#E5E5E5] divide-y-2 divide-slate-100 overflow-hidden">
+            {dailyQuests.length === 0 ? (
+              <div className="p-8 text-center text-slate-400 font-bold">
+                No active quests at the moment. Tell your instructor to create some!
               </div>
-            ))}
+            ) : (
+              dailyQuests.map((quest, index) => {
+                // Dynamically assign an icon based on the index to make it look diverse
+                const icons = [
+                  <Zap key={`icon-1`} size={32} className="text-[#FFD900]" fill="currentColor" />,
+                  <Target key={`icon-2`} size={32} className="text-[#58CC02]" fill="currentColor" />,
+                  <Clock key={`icon-3`} size={32} className="text-[#1CB0F6]" fill="currentColor" />
+                ];
+                const QuestIcon = icons[index % icons.length];
+                
+                // For MVP, we mock progress as 0 out of the total XP reward.
+                // In production, this would read from a user_quest progress table.
+                const currentProgress = 0;
+                const totalGoal = quest.reward_xp;
+                const isDone = currentProgress >= totalGoal;
+
+                return (
+                  <div key={quest.id} className="p-6 flex items-center gap-6">
+                    {/* Quest Icon */}
+                    <div className="shrink-0">
+                      {QuestIcon}
+                    </div>
+
+                    {/* Quest Details & Progress */}
+                    <div className="flex-1">
+                      <h3 className="font-black text-slate-700 text-lg mb-1">{quest.title}</h3>
+                      <p className="font-bold text-slate-400 text-sm mb-3">{quest.description}</p>
+                      
+                      <div className="flex items-center gap-4">
+                        <div className="relative flex-1 h-5 bg-slate-200 rounded-full overflow-hidden">
+                          <div 
+                            className={`absolute top-0 left-0 h-full rounded-full transition-all ${isDone ? 'bg-[#FFD900]' : 'bg-[#FFD900]'}`}
+                            style={{ width: `${(currentProgress / totalGoal) * 100}%` }}
+                          ></div>
+                          <span className="absolute w-full top-0.5 text-center text-[10px] font-black text-yellow-900 tracking-widest z-10">
+                            {currentProgress} / {totalGoal} XP
+                          </span>
+                        </div>
+                        {/* Chest Icon */}
+                        <Gift 
+                          size={28} 
+                          strokeWidth={2.5} 
+                          className={isDone ? "text-[#FF9600]" : "text-slate-300"} 
+                          fill={isDone ? "#FFD900" : "transparent"} 
+                        />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
           </div>
         </div>
       </div>
 
-      {/* RIGHT COLUMN: Monthly Badges Sidebar */}
+      {/* RIGHT COLUMN: Monthly Badges Sidebar (Static UI) */}
       <div className="w-full lg:w-[350px]">
         <div className="border-2 border-slate-200 rounded-3xl p-6 shadow-[0_6px_0_0_#E5E5E5] bg-white">
           

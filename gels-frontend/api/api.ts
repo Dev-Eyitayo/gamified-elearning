@@ -64,12 +64,14 @@ export const api = {
   // 3. GAMIFICATION (AFFECTIVE ENGINE)
   gamification: {
     getProfile: (userId: string) => fetchAPI(`/gamification/profile?user_id=${userId}`, { method: 'GET' }),
+    getAchievements: (userId: string) => fetchAPI(`/gamification/achievements?user_id=${userId}`, { method: 'GET' }),
     getLeaderboard: (scope = 'global', playerType?: string) => {
       const url = playerType ? `/gamification/leaderboard?scope=${scope}&player_type=${playerType}` : `/gamification/leaderboard?scope=${scope}`;
       return fetchAPI(url, { method: 'GET' });
     },
+    getSocialData: (userId: string) => fetchAPI(`/gamification/social?user_id=${userId}`, { method: 'GET' }),
     getQuests: () => fetchAPI('/gamification/quests', { method: 'GET' }),
-    getNotifications: () => fetchAPI('/gamification/notifications', { method: 'GET' })
+    getNotifications: (userId: string) => fetchAPI(`/gamification/notifications?user_id=${userId}`, { method: 'GET' }),
   },
 
   // 4. INSTRUCTOR (GLASS-BOX PORTAL)
@@ -77,7 +79,10 @@ export const api = {
     getCohortAnalytics: () => fetchAPI('/instructor/cohort-analytics', { method: 'GET' }),
     getDecisionLog: () => fetchAPI('/instructor/decision-log', { method: 'GET' }),
     createModule: (data: any) => fetchAPI('/instructor/modules', { method: 'POST', body: JSON.stringify(data) }),
-    overridePath: (data: any) => fetchAPI('/instructor/override-path', { method: 'POST', body: JSON.stringify(data) })
+    overridePath: (data: any) => fetchAPI('/instructor/override-path', { method: 'POST', body: JSON.stringify(data) }),
+    getRoster: () => fetchAPI('/instructor/roster', { method: 'GET' }),
+    overridePath: (data: any) => fetchAPI('/instructor/override-path', { method: 'POST', body: JSON.stringify(data) }),
+    updateSettings: () => fetchAPI('/instructor/settings', { method: 'PUT' }),
   },
 
   // 5. SYSTEM ADMIN
