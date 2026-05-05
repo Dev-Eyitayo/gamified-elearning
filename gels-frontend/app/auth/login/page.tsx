@@ -1,19 +1,54 @@
 "use client";
 
 import React, { useState } from 'react';
-import { Mail, Lock, ArrowRight, Zap, Target, BookOpen } from 'lucide-react';
+import { Mail, Lock, ArrowRight, Zap, Target, BookOpen, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { api } from '@/api/api'; // Make sure you saved the api.ts file in the lib folder!
 
 export default function LoginPage() {
+  const router = useRouter();
   const [formData, setFormData] = useState({ email: '', password: '' });
+  
+  // New state variables for API handling
+  const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Submitting Login:", formData);
+    setError('');
+    setIsLoading(true);
+
+    try {
+      // 1. Call the FastAPI backend via our api.ts client
+      const response = await api.auth.login(formData);
+      
+      // 2. Save the JWT Token and Role to local storage
+      localStorage.setItem('gels_token', response.access_token);
+      localStorage.setItem('gels_role', response.role);
+      
+      // Decode the JWT to get the user_id and save it
+      const tokenPayload = JSON.parse(atob(response.access_token.split('.')[1]));
+      localStorage.setItem('gels_user_id', tokenPayload.sub);
+
+      // 3. Redirect based on role
+      if (response.role === 'instructor') {
+        router.push('/instructor');
+      } else if (response.role === 'admin') {
+        router.push('/admin');
+      } else {
+        router.push('/classes'); // Learners go to their curriculum
+      }
+
+    } catch (err: any) {
+      setError(err.message || 'Failed to authenticate. Please check your credentials.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -69,14 +104,22 @@ export default function LoginPage() {
 
           <form onSubmit={handleSubmit} className="space-y-5">
             
+            {/* Error Message Display */}
+            {error && (
+              <div className="bg-[#FF4B4B]/10 border-2 border-[#FF4B4B]/20 text-[#FF4B4B] p-4 rounded-2xl flex items-center gap-3 font-bold text-sm">
+                <AlertCircle size={20} strokeWidth={2.5} />
+                {error}
+              </div>
+            )}
+
             <div className="space-y-2">
               <label className="text-sm font-black text-slate-500 uppercase tracking-widest pl-1">Email</label>
               <div className="relative group">
                 <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#1CB0F6] transition-colors" size={20} strokeWidth={3} />
                 <input 
                   type="email" name="email" required placeholder="email@university.edu"
-                  value={formData.email} onChange={handleInputChange}
-                  className="w-full bg-slate-100 border-2 border-slate-200 rounded-2xl pl-12 pr-4 py-3.5 text-base font-bold text-slate-700 focus:outline-none focus:border-[#1CB0F6] focus:bg-white transition-all placeholder-slate-400"
+                  value={formData.email} onChange={handleInputChange} disabled={isLoading}
+                  className="w-full bg-slate-100 border-2 border-slate-200 rounded-2xl pl-12 pr-4 py-3.5 text-base font-bold text-slate-700 focus:outline-none focus:border-[#1CB0F6] focus:bg-white transition-all placeholder-slate-400 disabled:opacity-50"
                 />
               </div>
             </div>
@@ -90,14 +133,22 @@ export default function LoginPage() {
                 <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#1CB0F6] transition-colors" size={20} strokeWidth={3} />
                 <input 
                   type="password" name="password" required placeholder="••••••••"
-                  value={formData.password} onChange={handleInputChange}
-                  className="w-full bg-slate-100 border-2 border-slate-200 rounded-2xl pl-12 pr-4 py-3.5 text-base font-bold text-slate-700 focus:outline-none focus:border-[#1CB0F6] focus:bg-white transition-all placeholder-slate-400"
+                  value={formData.password} onChange={handleInputChange} disabled={isLoading}
+                  className="w-full bg-slate-100 border-2 border-slate-200 rounded-2xl pl-12 pr-4 py-3.5 text-base font-bold text-slate-700 focus:outline-none focus:border-[#1CB0F6] focus:bg-white transition-all placeholder-slate-400 disabled:opacity-50"
                 />
               </div>
             </div>
 
-            <button type="submit" className="w-full bg-[#1CB0F6] text-white py-4 rounded-2xl text-base font-black uppercase tracking-widest transition-all border-b-4 border-[#1899D6] hover:bg-[#149FDF] active:translate-y-1 active:border-b-0 flex items-center justify-center gap-2 mt-8">
-              Log In <ArrowRight size={20} strokeWidth={3} />
+            <button 
+              type="submit" 
+              disabled={isLoading}
+              className={`w-full py-4 rounded-2xl text-base font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 mt-8 ${
+                isLoading 
+                  ? 'bg-slate-200 text-slate-400 cursor-wait border-b-4 border-slate-300' 
+                  : 'bg-[#1CB0F6] text-white border-b-4 border-[#1899D6] hover:bg-[#149FDF] active:translate-y-1 active:border-b-0'
+              }`}
+            >
+              {isLoading ? 'Logging in...' : 'Log In'} {!isLoading && <ArrowRight size={20} strokeWidth={3} />}
             </button>
           </form>
 

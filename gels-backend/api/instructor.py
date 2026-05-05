@@ -79,3 +79,51 @@ def create_module(data: ModuleCreate, db: Session = Depends(get_db)):
 def update_gamification_settings():
     """US-013: Toggle gamification mechanics (Mock)"""
     return {"success": True, "message": "Cohort gamification settings updated."}
+
+class CourseCreate(BaseModel):
+    title: str
+    icon: str
+    color_class: str
+    bg_class: str
+    border_class: str
+
+class DiagnosticQuestionCreate(BaseModel):
+    course_id: str
+    difficulty_level: str
+    question_text: str
+    options: list # List of dicts with 'id', 'text', 'isCorrect'
+
+@router.post("/courses")
+def create_course(data: CourseCreate, db: Session = Depends(get_db)):
+    """Allows Instructors to create new Courses dynamically"""
+    new_course = Course(**data.dict())
+    db.add(new_course)
+    db.commit()
+    return {"success": True, "course_id": str(new_course.course_id)}
+
+@router.post("/diagnostic-questions")
+def add_diagnostic_question(data: DiagnosticQuestionCreate, db: Session = Depends(get_db)):
+    """Allows Instructors to add questions to the onboarding diagnostic"""
+    new_question = DiagnosticQuestion(**data.dict())
+    db.add(new_question)
+    db.commit()
+    return {"success": True, "question_id": str(new_question.question_id)}
+
+class QuestCreate(BaseModel):
+    title: str
+    description: str
+    reward_xp: int
+    quest_type: str
+
+@router.post("/quests")
+def create_quest(data: QuestCreate, db: Session = Depends(get_db)):
+    """Allows Instructors to dynamically add Daily Quests"""
+    new_quest = Quest(
+        title=data.title,
+        description=data.description,
+        reward_xp=data.reward_xp,
+        quest_type=data.quest_type
+    )
+    db.add(new_quest)
+    db.commit()
+    return {"success": True, "quest_id": str(new_quest.quest_id)}
