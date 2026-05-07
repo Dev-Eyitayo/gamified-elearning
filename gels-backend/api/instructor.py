@@ -1,9 +1,14 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, BackgroundTasks
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import func
 from pydantic import BaseModel
 from core.database import get_db
 from models.domain import LearnerProfile, DecisionLog, Module, Difficulty, User
+import shutil
+import os
+from services.ai_engine import generate_curriculum_from_asset
+
+os.makedirs("uploads/modules", exist_ok=True)
 
 router = APIRouter(prefix="/api/instructor", tags=["Instructor Glass-Box Portal"])
 
@@ -56,24 +61,48 @@ def manual_path_override(data: OverrideRequest, db: Session = Depends(get_db)):
     return {"success": True, "message": "Override logged successfully"}
 
 @router.post("/modules")
-def create_module(data: ModuleCreate, db: Session = Depends(get_db)):
-    """US-009: Upload structured modules"""
+async def create_module(
+    background_tasks: BackgroundTasks, # <-- Inject the BackgroundTasks manager
+    title: str = Form(...),
+    name: str = Form(...),
+    topic_id: str = Form(...),
+    difficulty: str = Form(...),
+    estimated_minutes: int = Form(...),
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db)
+):
+    """US-009: Upload structured modules and trigger AI auto-generation"""
+    
+    # 1. Save the file locally to the server
+    file_location = f"uploads/modules/{file.filename}"
+    with open(file_location, "wb+") as file_object:
+        shutil.copyfileobj(file.file, file_object)
+
     try:
-        diff_enum = Difficulty(data.difficulty.upper())
+        diff_enum = Difficulty(difficulty.upper())
     except ValueError:
         diff_enum = Difficulty.MEDIUM
 
+    # 2. Save the Module record to PostgreSQL
     new_module = Module(
-        title=data.title,
-        name=data.name,
-        topic_id=data.topic_id,
+        title=title,
+        name=name,
+        topic_id=topic_id,
         difficulty=diff_enum,
-        content_url=data.content_url,
-        estimated_minutes=data.estimated_minutes
+        content_url=file_location,
+        estimated_minutes=estimated_minutes
     )
     db.add(new_module)
     db.commit()
-    return {"success": True, "module_id": str(new_module.module_id)}
+    
+    # 3. MAGIC HAPPENS HERE: Tell the server to parse the file with Gemini in the background!
+    background_tasks.add_task(generate_curriculum_from_asset, str(new_module.module_id), file_location)
+    
+    return {
+        "success": True, 
+        "module_id": str(new_module.module_id), 
+        "message": "File uploaded! The Cognitive Engine is currently generating the interactive quiz."
+    }
 
 @router.put("/settings")
 def update_gamification_settings():

@@ -1,9 +1,10 @@
 from pydantic import BaseModel
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from uuid import UUID
 
+
 class AssessmentSubmit(BaseModel):
-    module_id: str
+    module_id: Optional[str] = None
     score: float  # e.g., 0.85 for 85%
     time_spent_seconds: int
     attempts: int

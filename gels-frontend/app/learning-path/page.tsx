@@ -169,13 +169,13 @@ export default function LearningPath() {
                   
                   {/* 3D "Pressable" Button for Active Module */}
                   {mod.status === 'active' && (
-                    <button 
-                      onClick={() => router.push('/lesson')}
-                      className="mt-6 w-full sm:w-auto bg-[#1CB0F6] text-white px-8 py-3.5 rounded-2xl text-sm font-black uppercase tracking-widest transition-all border-b-4 border-[#1899D6] hover:bg-[#149FDF] active:translate-y-1 active:border-b-0 flex items-center justify-center gap-2"
-                    >
-                      Start Lesson <ArrowRight size={20} strokeWidth={3} />
-                    </button>
-                  )}
+                        <button 
+                            onClick={() => router.push(`/learning/${mod.id}/start`)}
+                            className="mt-6 w-full sm:w-auto bg-[#1CB0F6] text-white px-8 py-3.5 rounded-2xl text-sm font-black uppercase tracking-widest transition-all border-b-4 border-[#1899D6] hover:bg-[#149FDF] active:translate-y-1 active:border-b-0 flex items-center justify-center gap-2"
+                        >
+                            Start Lesson <ArrowRight size={20} strokeWidth={3} />
+                        </button>
+                    )}
                 </div>
 
               </div>

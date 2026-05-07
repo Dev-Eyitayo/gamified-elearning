@@ -3,20 +3,48 @@ from sqlalchemy.orm import Session
 from sqlalchemy import desc
 from core.database import get_db
 from models.domain import LearnerProfile, User, Quest, Achievement, Notification
+from datetime import datetime, timezone, timedelta
 
 router = APIRouter(prefix="/api/gamification", tags=["Affective Engine"])
 
 @router.get("/profile")
 def get_profile(user_id: str, db: Session = Depends(get_db)):
-    """Fetches the user's gamification stats AND their personal details"""
+    """Fetches the user's gamification stats AND calculates Gem Refills"""
     
     profile = db.query(LearnerProfile).filter(LearnerProfile.user_id == user_id).first()
-    
-    # 👇 THIS IS THE LINE THAT WAS FIXED (User.id -> User.user_id) 👇
-    user = db.query(User).filter(User.user_id == user_id).first() 
+    user = db.query(User).filter(User.user_id == user_id).first()
     
     if not profile or not user:
         raise HTTPException(status_code=404, detail="Profile not found")
+
+    # --- 🔥 DYNAMIC GEM REFILL LOGIC ---
+    MAX_GEMS = 25
+    SECONDS_PER_GEM = 86400 / 25  # 24 hours / 25 gems = 3456 seconds per gem
+
+    if profile.gems < MAX_GEMS:
+        now = datetime.now(timezone.utc)
+        
+        # Ensure timezone safety
+        last_update = profile.last_gem_update
+        if last_update.tzinfo is None:
+            last_update = last_update.replace(tzinfo=timezone.utc)
+
+        time_passed = (now - last_update).total_seconds()
+        
+        if time_passed >= SECONDS_PER_GEM:
+            # Calculate how many full gems they earned while they were gone
+            gems_earned = int(time_passed // SECONDS_PER_GEM)
+            new_gem_count = min(MAX_GEMS, profile.gems + gems_earned)
+            
+            profile.gems = new_gem_count
+            
+            # Advance the timer by the exact chunks of time used
+            if new_gem_count == MAX_GEMS:
+                profile.last_gem_update = now # Reset timer fully
+            else:
+                profile.last_gem_update += timedelta(seconds=gems_earned * SECONDS_PER_GEM)
+            
+            db.commit() # Save the newly generated gems!
 
     username = user.email.split('@')[0]
     
@@ -27,7 +55,8 @@ def get_profile(user_id: str, db: Session = Depends(get_db)):
         "streak_days": profile.streak_days,
         "player_type": profile.player_type.value,
         "current_level": profile.current_level,
-        "engagement_score": profile.engagement_score
+        "engagement_score": profile.engagement_score,
+        "gems": profile.gems  # <-- Return the gems to the frontend
     }
 
 @router.get("/leaderboard")
@@ -111,6 +140,10 @@ def get_user_achievements(user_id: str, db: Session = Depends(get_db)):
 def get_notifications(user_id: str, db: Session = Depends(get_db)):
     """Fetches real notifications for the user from the database"""
     
+    # --- ADD THIS SAFETY CHECK ---
+    if user_id == "undefined" or not user_id:
+        return []
+        
     notifications = db.query(Notification).filter(Notification.user_id == user_id).order_by(desc(Notification.created_at)).all()
     
     return [
@@ -119,7 +152,7 @@ def get_notifications(user_id: str, db: Session = Depends(get_db)):
             "type": n.type,
             "title": n.title,
             "message": n.message,
-            "time": "Recent", # For MVP. In production, calculate time diff from n.created_at
+            "time": "Recent",
             "isRead": n.is_read
         }
         for n in notifications

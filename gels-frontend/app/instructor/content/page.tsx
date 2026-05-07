@@ -12,6 +12,7 @@ export default function ContentManagementPage() {
   useEffect(() => {
     const loadModules = async () => {
       try {
+        // Fetch 100% real data from the database
         const data = await api.learning.getModules();
         setModules(data);
       } catch (err) {
@@ -27,7 +28,7 @@ export default function ContentManagementPage() {
     return (
       <div className="py-20 flex flex-col items-center justify-center text-slate-400">
         <Loader2 className="animate-spin mb-4 text-[#58CC02]" size={48} strokeWidth={3} />
-        <h2 className="font-black tracking-widest uppercase">Loading Curriculum Base...</h2>
+        <h2 className="font-black tracking-widest uppercase">Syncing Database...</h2>
       </div>
     );
   }
@@ -47,7 +48,7 @@ export default function ContentManagementPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {modules.length === 0 ? (
           <div className="col-span-3 text-center py-12 text-slate-400 font-bold border-2 border-dashed border-slate-200 rounded-3xl">
-            No modules exist. Click "Upload Module" to populate the database.
+            No modules in the database. Click "Upload Module" to create one.
           </div>
         ) : modules.map((mod) => (
           <div key={mod.module_id} className="bg-white border-2 border-slate-200 rounded-3xl p-6 shadow-[0_6px_0_0_#E5E5E5] flex flex-col transition-transform hover:-translate-y-1">

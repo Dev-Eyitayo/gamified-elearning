@@ -8,8 +8,8 @@ import TopNav from "./TopNav";
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
-  // If on the auth page, render without Sidebar and TopNav
-  if (pathname.startsWith("/auth") || pathname === "/onboarding" || pathname === "/lesson") {
+  // 👇 FIX: Changed to startsWith("/learning/") to catch dynamic URLs
+  if (pathname.startsWith("/auth") || pathname === "/onboarding" || pathname.startsWith("/learning/")) {
     return <main className="min-h-screen bg-white">{children}</main>;
   }
 

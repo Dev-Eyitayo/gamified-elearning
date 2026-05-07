@@ -67,7 +67,8 @@ export default function OnboardingPage() {
       setPhase('processing');
       try {
         const userId = localStorage.getItem('gels_user_id');
-        let baselineScore = score / activeQuiz.length; 
+        // Prevent division by zero if activeQuiz is empty
+        let baselineScore = activeQuiz.length > 0 ? (score / activeQuiz.length) : 0.5; 
         
         if (selectedLevel === 'intermediate') baselineScore = Math.min(baselineScore + 0.3, 1.0);
         if (selectedLevel === 'advanced') baselineScore = Math.min(baselineScore + 0.6, 1.0);
@@ -91,7 +92,7 @@ export default function OnboardingPage() {
     <div className="w-full h-4 bg-slate-100 rounded-full overflow-hidden border-2 border-slate-200 mb-8 max-w-2xl mx-auto mt-6">
       <div 
         className={`h-full rounded-full transition-all duration-500 ${color}`}
-        style={{ width: `${((current) / total) * 100}%` }}
+        style={{ width: `${((current) / (total || 1)) * 100}%` }}
       >
         <div className="w-full h-1/3 bg-white/30 rounded-full mt-0.5 ml-1"></div>
       </div>
@@ -205,46 +206,67 @@ export default function OnboardingPage() {
         </div>
       )}
 
-      {/* PHASE 4: DYNAMIC QUIZ */}
-      {phase === 'quiz' && activeQuiz && (
+      {/* PHASE 4: DYNAMIC QUIZ WITH SAFETY CHECK */}
+      {phase === 'quiz' && (
         <div className="flex-1 flex flex-col w-full max-w-3xl mx-auto p-4 animate-in slide-in-from-right duration-300">
-          {renderProgressBar(currentQuizIdx, activeQuiz.length, "bg-[#1CB0F6]")}
           
-          <div className="flex-1 flex flex-col justify-center">
-            <h2 className="text-3xl sm:text-4xl font-black text-slate-700 mb-10 leading-tight text-center">
-              {activeQuiz[currentQuizIdx].question}
-            </h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {activeQuiz[currentQuizIdx].options.map((opt: any) => (
-                <button
-                  key={opt.id}
-                  onClick={() => setSelectedQuizOption(opt.id)}
-                  className={`p-6 rounded-2xl text-left border-2 border-b-4 transition-all text-xl font-bold flex items-center gap-4 ${
-                    selectedQuizOption === opt.id 
-                      ? 'bg-[#DDF4FF] border-[#1CB0F6] text-[#1CB0F6] transform translate-y-1 border-b-2' 
-                      : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+          {/* CRITICAL FIX: Only render the question if the database actually returned questions! */}
+          {activeQuiz && activeQuiz.length > 0 && activeQuiz[currentQuizIdx] ? (
+            <>
+              {renderProgressBar(currentQuizIdx, activeQuiz.length, "bg-[#1CB0F6]")}
+              
+              <div className="flex-1 flex flex-col justify-center">
+                <h2 className="text-3xl sm:text-4xl font-black text-slate-700 mb-10 leading-tight text-center">
+                  {activeQuiz[currentQuizIdx].question}
+                </h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {activeQuiz[currentQuizIdx].options.map((opt: any) => (
+                    <button
+                      key={opt.id}
+                      onClick={() => setSelectedQuizOption(opt.id)}
+                      className={`p-6 rounded-2xl text-left border-2 border-b-4 transition-all text-xl font-bold flex items-center gap-4 ${
+                        selectedQuizOption === opt.id 
+                          ? 'bg-[#DDF4FF] border-[#1CB0F6] text-[#1CB0F6] transform translate-y-1 border-b-2' 
+                          : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center shrink-0 ${selectedQuizOption === opt.id ? 'border-[#1CB0F6] bg-white' : 'border-slate-300'}`}>
+                        {selectedQuizOption === opt.id && <div className="w-4 h-4 rounded-full bg-[#1CB0F6]"></div>}
+                      </div>
+                      {opt.text}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="py-6 border-t-2 border-slate-100 mt-auto">
+                <button 
+                  disabled={!selectedQuizOption}
+                  onClick={handleNextQuiz}
+                  className={`w-full py-4 rounded-2xl text-lg font-black uppercase tracking-widest transition-all ${
+                    selectedQuizOption ? 'bg-[#1CB0F6] text-white border-b-4 border-[#1899D6] active:translate-y-1 active:border-b-0' : 'bg-slate-200 text-slate-400 cursor-not-allowed'
                   }`}
                 >
-                  <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center shrink-0 ${selectedQuizOption === opt.id ? 'border-[#1CB0F6] bg-white' : 'border-slate-300'}`}>
-                    {selectedQuizOption === opt.id && <div className="w-4 h-4 rounded-full bg-[#1CB0F6]"></div>}
-                  </div>
-                  {opt.text}
+                  Continue
                 </button>
-              ))}
+              </div>
+            </>
+          ) : (
+            // GRACEFUL FALLBACK: If the DB is empty, let them skip to the survey!
+            <div className="flex-1 flex flex-col items-center justify-center text-center mt-20">
+              <div className="w-24 h-24 bg-slate-100 rounded-full flex items-center justify-center mb-6">
+                <Database className="text-slate-300" size={40} strokeWidth={2} />
+              </div>
+              <h2 className="text-3xl font-black text-slate-700 mb-4">No diagnostic questions found!</h2>
+              <p className="text-slate-500 font-bold mb-8 max-w-md">Your instructor hasn't added any diagnostic questions for the '{selectedLevel}' level to the database yet.</p>
+              <button 
+                onClick={() => setPhase('surveyIntro')}
+                className="bg-[#1CB0F6] text-white px-8 py-4 rounded-2xl text-lg font-black uppercase tracking-widest border-b-4 border-[#1899D6] hover:bg-[#149FDF] active:translate-y-1 active:border-b-0 shadow-sm"
+              >
+                Skip to Survey
+              </button>
             </div>
-          </div>
-
-          <div className="py-6 border-t-2 border-slate-100 mt-auto">
-            <button 
-              disabled={!selectedQuizOption}
-              onClick={handleNextQuiz}
-              className={`w-full py-4 rounded-2xl text-lg font-black uppercase tracking-widest transition-all ${
-                selectedQuizOption ? 'bg-[#1CB0F6] text-white border-b-4 border-[#1899D6] active:translate-y-1 active:border-b-0' : 'bg-slate-200 text-slate-400 cursor-not-allowed'
-              }`}
-            >
-              Continue
-            </button>
-          </div>
+          )}
         </div>
       )}
 

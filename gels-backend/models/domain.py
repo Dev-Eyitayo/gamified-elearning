@@ -31,7 +31,7 @@ class User(Base):
     role = Column(SQLEnum(UserRole), default=UserRole.learner, nullable=False)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     last_active = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
-
+    
     profile = relationship("LearnerProfile", back_populates="user", uselist=False)
 
 class LearnerProfile(Base):
@@ -46,7 +46,8 @@ class LearnerProfile(Base):
     current_level = Column(Integer, default=1)
     streak_days = Column(Integer, default=0)
     last_updated = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
-
+    gems = Column(Integer, default=25)
+    last_gem_update = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     user = relationship("User", back_populates="profile")
 
 class Module(Base):

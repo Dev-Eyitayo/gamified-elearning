@@ -24,6 +24,8 @@ async function fetchAPI(endpoint: string, options: RequestInit = {}) {
       ...getAuthHeaders(),
       ...options.headers,
     },
+    // 👇 CRITICAL: Prevents Next.js from permanently caching 404 errors!
+    cache: 'no-store' 
   });
 
   if (!response.ok) {
@@ -52,9 +54,9 @@ export const api = {
 
   // 2. LEARNING & ONBOARDING
   learning: {
-    // 👇 THIS IS THE LINE THAT WAS MISSING 👇
+    getLesson: (moduleName: string, lessonId: string) => fetchAPI(`/learning/${moduleName}/${lessonId}?t=${new Date().getTime()}`, { method: 'GET' }),
     getOnboardingConfig: () => fetchAPI('/learning/onboarding-config', { method: 'GET' }),
-    
+    getQuestion: () => fetchAPI(`/learning/question?t=${new Date().getTime()}`, { method: 'GET' }),    
     completeOnboarding: (data: any) => fetchAPI('/learning/onboarding', { method: 'POST', body: JSON.stringify(data) }),
     getModules: () => fetchAPI('/learning/modules', { method: 'GET' }),
     submitAssessment: (userId: string, data: any) => fetchAPI(`/learning/submit-assessment?user_id=${userId}`, { method: 'POST', body: JSON.stringify(data) }),
@@ -76,10 +78,11 @@ export const api = {
 
   // 4. INSTRUCTOR (GLASS-BOX PORTAL)
   instructor: {
-    getCohortAnalytics: () => fetchAPI('/instructor/cohort-analytics', { method: 'GET' }),
-    getDecisionLog: () => fetchAPI('/instructor/decision-log', { method: 'GET' }),
-    createModule: (data: any) => fetchAPI('/instructor/modules', { method: 'POST', body: JSON.stringify(data) }),
-    overridePath: (data: any) => fetchAPI('/instructor/override-path', { method: 'POST', body: JSON.stringify(data) }),
+    // 👇 Fixed function names and added addQuest to match your Instructor Dashboard UI
+    getAnalytics: () => fetchAPI('/instructor/cohort-analytics', { method: 'GET' }),
+    getLogs: () => fetchAPI('/instructor/decision-log', { method: 'GET' }),
+    addModule: (data: any) => fetchAPI('/instructor/modules', { method: 'POST', body: JSON.stringify(data) }),
+    addQuest: (data: any) => fetchAPI('/instructor/quests', { method: 'POST', body: JSON.stringify(data) }),
     getRoster: () => fetchAPI('/instructor/roster', { method: 'GET' }),
     overridePath: (data: any) => fetchAPI('/instructor/override-path', { method: 'POST', body: JSON.stringify(data) }),
     updateSettings: () => fetchAPI('/instructor/settings', { method: 'PUT' }),

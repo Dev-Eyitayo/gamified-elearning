@@ -150,8 +150,8 @@ export default function LearnerDashboard() {
               </p>
               
               <div className="flex flex-col sm:flex-row items-center gap-6">
-                <button 
-                  onClick={() => router.push('/lesson')}
+                <button
+                  onClick={() => router.push(`/learning/${nextModule.module_id || 'default'}/start`)}
                   className="w-full sm:w-auto bg-[#58CC02] text-white px-10 py-4 rounded-2xl text-lg font-black uppercase tracking-widest transition-all border-b-4 border-[#46A302] hover:bg-[#46A302] active:translate-y-1 active:border-b-0 flex items-center justify-center gap-3 shadow-sm"
                 >
                   <Play size={24} strokeWidth={3} fill="currentColor" /> Start Lesson

@@ -3,21 +3,23 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Save, FileText, Clock, Link as LinkIcon, Hash, Target, Sparkles, AlertTriangle, Flame, Loader2 } from 'lucide-react';
-import { api } from '@/api/api';
+import { ArrowLeft, Save, FileText, Clock, Hash, Target, Sparkles, AlertTriangle, Flame, Loader2, UploadCloud, File as FileIcon } from 'lucide-react';
 
 export default function AddModulePage() {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   
+  // Text fields state
   const [formData, setFormData] = useState({
     title: '',
     name: '',
     topic_id: '',
     difficulty: 'EASY',
     estimated_minutes: 15,
-    content_url: '',
   });
+
+  // File state for local upload tracking
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -27,16 +29,42 @@ export default function AddModulePage() {
     setFormData({ ...formData, difficulty: level });
   };
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setSelectedFile(e.target.files[0]);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!selectedFile) {
+      alert("Please upload a local asset file so the Affective Engine can track user readability.");
+      return;
+    }
+
     setIsSubmitting(true);
     try {
-      // POST the real data to the backend!
-      await api.instructor.createModule(formData);
+      // Create FormData to send the file + text data to FastAPI
+      const payload = new FormData();
+      payload.append("title", formData.title);
+      payload.append("name", formData.name);
+      payload.append("topic_id", formData.topic_id);
+      payload.append("difficulty", formData.difficulty);
+      payload.append("estimated_minutes", formData.estimated_minutes.toString());
+      payload.append("file", selectedFile); // Attach the actual file
+
+      // Bypass api.ts for this specific request to handle multipart/form-data natively
+      const response = await fetch('http://localhost:8000/api/instructor/modules', {
+        method: 'POST',
+        body: payload,
+      });
+
+      if (!response.ok) throw new Error("Upload failed");
+      
       router.push('/instructor/content');
     } catch (err) {
       console.error("Failed to create module", err);
-      alert("Failed to save module. Check the backend logs.");
+      alert("Failed to save module. Check backend logs.");
       setIsSubmitting(false);
     }
   };
@@ -167,21 +195,42 @@ export default function AddModulePage() {
 
         <hr className="border-t-2 border-slate-100" />
 
-        {/* --- SECTION 3: Content Linking --- */}
+        {/* --- SECTION 3: NATIVE FILE UPLOAD --- */}
         <div className="space-y-6">
           <h2 className="text-xl font-black text-slate-700 uppercase tracking-widest flex items-center gap-2">
-            <LinkIcon className="text-[#FF9600]" size={24} strokeWidth={3} /> Asset Link
+            <UploadCloud className="text-[#FF9600]" size={24} strokeWidth={3} /> Local Asset Upload
           </h2>
           
           <div className="space-y-2">
-            <label className="text-sm font-black text-slate-500 uppercase tracking-widest pl-1">Content URL (Video, Markdown, or Slides)</label>
-            <div className="relative group">
-              <LinkIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#FF9600] transition-colors" size={20} strokeWidth={3} />
+            <p className="text-sm font-bold text-slate-500 leading-relaxed mb-2">
+              Upload the module content (.md, .pdf, or .mp4). By hosting this locally, the Affective Engine can actively track read-time, scroll depth, and engagement rates to adapt the curriculum.
+            </p>
+            
+            <div className="relative border-2 border-dashed border-slate-300 rounded-3xl p-10 bg-slate-50 flex flex-col items-center justify-center hover:bg-slate-100 transition-colors group cursor-pointer">
               <input 
-                type="url" name="content_url" required placeholder="https://cdn.gels.edu/modules/4-1.md"
-                value={formData.content_url} onChange={handleInputChange}
-                className="w-full bg-slate-100 border-2 border-slate-200 rounded-2xl pl-12 pr-4 py-3.5 text-base font-bold text-slate-700 focus:outline-none focus:border-[#FF9600] focus:bg-white transition-all placeholder-slate-400"
+                type="file" 
+                onChange={handleFileChange}
+                accept=".md,.pdf,.mp4"
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" 
               />
+              
+              {selectedFile ? (
+                <div className="flex flex-col items-center text-center">
+                  <div className="w-16 h-16 bg-[#58CC02]/10 text-[#58CC02] rounded-full flex items-center justify-center mb-4 border-2 border-[#58CC02]/20">
+                    <FileIcon size={32} strokeWidth={2.5} />
+                  </div>
+                  <h3 className="font-black text-slate-700 text-lg">{selectedFile.name}</h3>
+                  <p className="text-slate-500 font-bold text-sm mt-1">Ready for upload ({(selectedFile.size / 1024 / 1024).toFixed(2)} MB)</p>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center text-center">
+                  <div className="w-16 h-16 bg-[#FF9600]/10 text-[#FF9600] rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform border-2 border-[#FF9600]/20">
+                    <UploadCloud size={32} strokeWidth={2.5} />
+                  </div>
+                  <h3 className="font-black text-slate-700 text-lg">Click to browse or drag file here</h3>
+                  <p className="text-slate-500 font-bold text-sm mt-1">Markdown, PDF, or MP4 Video</p>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -202,7 +251,7 @@ export default function AddModulePage() {
             }`}
           >
             {isSubmitting ? <Loader2 size={20} strokeWidth={3} className="animate-spin" /> : <Save size={20} strokeWidth={3} />} 
-            Save Module
+            Save & Upload
           </button>
         </div>
       </form>
