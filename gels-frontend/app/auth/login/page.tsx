@@ -4,13 +4,12 @@ import React, { useState } from 'react';
 import { Mail, Lock, ArrowRight, Zap, Target, BookOpen, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { api } from '@/api/api'; // Make sure you saved the api.ts file in the lib folder!
+import { api } from '@/api/api'; 
 
 export default function LoginPage() {
   const router = useRouter();
   const [formData, setFormData] = useState({ email: '', password: '' });
   
-  // New state variables for API handling
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
@@ -24,28 +23,42 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      // 1. Call the FastAPI backend via our api.ts client
       const response = await api.auth.login(formData);
       
-      // 2. Save the JWT Token and Role to local storage
-      localStorage.setItem('gels_token', response.access_token);
-      localStorage.setItem('gels_role', response.role);
-      
-      // Decode the JWT to get the user_id and save it
-      const tokenPayload = JSON.parse(atob(response.access_token.split('.')[1]));
-      localStorage.setItem('gels_user_id', tokenPayload.sub);
-
-      // 3. Redirect based on role
-      if (response.role === 'instructor') {
-        router.push('/instructor');
-      } else if (response.role === 'admin') {
-        router.push('/admin');
-      } else {
-        router.push('/classes'); // Learners go to their curriculum
+      // Safety check: If the API client returns nothing, throw an explicit error
+      if (!response) {
+        throw new Error("Server did not return a valid response.");
       }
 
+      // HYBRID FIX: Safely handle whatever the backend sends without crashing.
+
+      // 1. If backend still sends the raw access_token, save it and decode it safely.
+      if (response?.access_token) {
+        localStorage.setItem('gels_token', response.access_token);
+        try {
+          // Safely decode the token payload
+          const tokenPayload = JSON.parse(atob(response.access_token.split('.')[1]));
+          if (tokenPayload.sub) {
+            localStorage.setItem('gels_user_id', tokenPayload.sub);
+          }
+        } catch (decodeErr) {
+          console.warn("Could not decode token", decodeErr);
+        }
+      }
+
+      // 2. Safely grab Role and User ID if the backend explicitly provides them
+      if (response?.role) {
+        localStorage.setItem('gels_role', response.role);
+      }
+      if (response?.user_id) {
+        localStorage.setItem('gels_user_id', response.user_id);
+      }
+      
+      // Navigate to Dashboard
+      router.push('/');
     } catch (err: any) {
-      setError(err.message || 'Failed to authenticate. Please check your credentials.');
+      console.error("Login failed:", err);
+      setError(err.message || 'Invalid email or password. Please try again.');
     } finally {
       setIsLoading(false);
     }

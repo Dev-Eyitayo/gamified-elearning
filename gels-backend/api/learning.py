@@ -9,6 +9,8 @@ from services.ai_engine import run_edm_pipeline
 from models.domain import Course, DiagnosticQuestion
 import random
 from datetime import datetime, timezone
+import uuid
+from services.league_engine import process_weekly_leagues
 
 router = APIRouter(prefix="/api/learning", tags=["Learning & Core Loop"])
 
@@ -80,7 +82,6 @@ def get_curriculum_modules(db: Session = Depends(get_db)):
 def submit_assessment(data: AssessmentSubmit, user_id: str, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     """Triggers EDM Pipeline via Background Task AND Awards Gamification XP"""
     
-    # 1. Log the assessment attempt
     new_event = EventLog(
         user_id=user_id,
         event_type="ASSESSMENT_SUBMIT",
@@ -94,31 +95,48 @@ def submit_assessment(data: AssessmentSubmit, user_id: str, background_tasks: Ba
     if profile:
         # If Correct: Give XP
         if data.score > 0:  
-            awarded_xp = 5
+            awarded_xp = 15 # Boosted to match realistic league grinds
             profile.xp_total += awarded_xp
             
+            # 🔥 LEAGUE MECHANIC: Add to weekly XP
+            # Use getattr/setattr to prevent crashes if the DB column isn't migrated yet
+            current_weekly = getattr(profile, 'weekly_xp', 0)
+            setattr(profile, 'weekly_xp', current_weekly + awarded_xp)
+            
+            # 🔥 LEAGUE MECHANIC: Assign to a cohort of 30 if they don't have one
+            if not getattr(profile, 'cohort_id', None):
+                # Find an active cohort in their current league with less than 30 people
+                # (Simplified matchmaking for MVP)
+                active_cohort = db.query(LearnerProfile.cohort_id).filter(
+                    LearnerProfile.current_league == getattr(profile, 'current_league', 'Bronze'),
+                    LearnerProfile.cohort_id != None
+                ).group_by(LearnerProfile.cohort_id).having(db.func.count() < 30).first()
+                
+                if active_cohort:
+                    profile.cohort_id = active_cohort[0]
+                else:
+                    # Create a new cohort bracket
+                    profile.cohort_id = f"cohort_{getattr(profile, 'current_league', 'Bronze')}_{uuid.uuid4().hex[:8]}"
+
             if profile.streak_days == 0:
                 profile.streak_days = 1
         
-        # 🔥 If Incorrect: Deduct a Gem!
+        # If Incorrect: Deduct a Gem
         else:
             if profile.gems > 0:
-                # If they were at MAX (25), start the refill countdown clock RIGHT NOW
                 if profile.gems == 25:
                     profile.last_gem_update = datetime.now(timezone.utc)
-                
                 profile.gems -= 1
 
         db.commit()
 
-    # 3. Trigger the AI evaluation in the background
     background_tasks.add_task(run_edm_pipeline, user_id)
     
     return {
         "status": "success", 
         "message": "Assessment logged.",
         "xp_awarded": awarded_xp,
-        "gems_remaining": profile.gems if profile else 0 # Let frontend know
+        "gems_remaining": profile.gems if profile else 0
     }
 
 @router.get("/next-module")
@@ -131,20 +149,44 @@ def get_next_module(user_id: str, db: Session = Depends(get_db)):
 
 @router.get("/onboarding-config")
 def get_onboarding_config(db: Session = Depends(get_db)):
-    """Dynamically fetches Courses and Diagnostic Quizzes from the Database"""
+    """Dynamically fetches Instructor Modules (as Courses) and Diagnostic Quizzes from the Database"""
     
-    # 1. Fetch live courses from the DB
-    db_courses = db.query(Course).all()
-    courses_payload = [
-        {
-            "id": str(c.course_id), 
-            "title": c.title, 
-            "icon": c.icon, 
-            "colorClass": c.color_class, 
-            "bgClass": c.bg_class, 
-            "borderClass": c.border_class
-        } for c in db_courses
+    # 1. Fetch live MODULES added by the instructor instead of the hardcoded Course table!
+    db_modules = db.query(Module).all()
+    
+    # Visual assets to keep the frontend looking beautiful
+    icons = ["Code", "Database", "Layout", "Book", "Rocket", "Compass"]
+    palettes = [
+        {"colorClass": "text-[#1CB0F6]", "bgClass": "bg-[#DDF4FF]", "borderClass": "border-[#1CB0F6]"},
+        {"colorClass": "text-[#58CC02]", "bgClass": "bg-[#D7FFB8]", "borderClass": "border-[#58CC02]"},
+        {"colorClass": "text-[#FF9600]", "bgClass": "bg-[#FFDFB8]", "borderClass": "border-[#FF9600]"},
+        {"colorClass": "text-[#CE82FF]", "bgClass": "bg-[#F4E0FF]", "borderClass": "border-[#CE82FF]"},
     ]
+    
+    courses_payload = []
+    for idx, mod in enumerate(db_modules):
+        p = palettes[idx % len(palettes)]
+        courses_payload.append({
+            "id": str(mod.module_id), 
+            "title": mod.name, # Use the actual module name (e.g. Intro to Data Structures)
+            "icon": icons[idx % len(icons)], 
+            "colorClass": p["colorClass"], 
+            "bgClass": p["bgClass"], 
+            "borderClass": p["borderClass"]
+        })
+
+    # Graceful fallback just in case the instructor hasn't uploaded anything yet
+    if not courses_payload:
+        courses_payload = [
+            {
+                "id": "pending",
+                "title": "Waiting for Instructor...",
+                "icon": "Loader2",
+                "colorClass": "text-slate-400",
+                "bgClass": "bg-slate-100",
+                "borderClass": "border-slate-200"
+            }
+        ]
 
     # 2. Fetch live diagnostic questions and group them by difficulty
     db_questions = db.query(DiagnosticQuestion).all()
@@ -293,3 +335,9 @@ def get_specific_lesson(module_id: str, lesson_id: str, db: Session = Depends(ge
         raise  # Pass 404s cleanly to the frontend
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+@router.post("/admin/trigger-league-reset")
+def trigger_league_reset(db: Session = Depends(get_db)):
+    """Admin route to manually trigger the Sunday midnight league resets."""
+    process_weekly_leagues(db)
+    return {"message": "Leagues processed. Weekly XP reset. Cohorts shuffled."}

@@ -49,6 +49,9 @@ class LearnerProfile(Base):
     gems = Column(Integer, default=25)
     last_gem_update = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     user = relationship("User", back_populates="profile")
+    current_league = Column(String, default="Bronze") # Bronze, Silver, Gold... Diamond
+    weekly_xp = Column(Integer, default=0)
+    cohort_id = Column(String, nullable=True)
 
 class Module(Base):
     __tablename__ = "modules"

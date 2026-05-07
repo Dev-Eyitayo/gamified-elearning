@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { Edit2, Flame, Zap, Shield, Medal, ChevronRight, Search, Mail, UserPlus, Loader2, AlertCircle, BrainCircuit, Users } from 'lucide-react';
+import { Edit2, Flame, Zap, Shield, Medal, ChevronRight, Search, Mail, UserPlus, Loader2, AlertCircle, Trophy, Users } from 'lucide-react';
 import { api } from '@/api/api';
 
 export default function ProfilePage() {
@@ -16,8 +16,14 @@ export default function ProfilePage() {
   useEffect(() => {
     const fetchProfileData = async () => {
       try {
-        const userId = localStorage.getItem('gels_user_id');
-        if (!userId) return;
+        // Safely grab the user ID from the browser
+        const userId = typeof window !== "undefined" ? localStorage.getItem('gels_user_id') : null;
+        
+        if (!userId) {
+          setError("User session not found. Please log in again.");
+          setIsLoading(false);
+          return;
+        }
 
         // Fetch both Personal Profile AND Social Cohort concurrently
         const [profileRes, socialRes] = await Promise.all([
@@ -38,12 +44,35 @@ export default function ProfilePage() {
     fetchProfileData();
   }, []);
 
+  // 🔥 10-TIER LEAGUE SYSTEM (Based on your exact XP criteria)
   const calculateLeague = (xp: number) => {
-    if (xp < 1000) return "Bronze";
-    if (xp < 5000) return "Silver";
-    if (xp < 15000) return "Gold";
-    if (xp < 30000) return "Emerald";
-    return "Sapphire";
+    if (xp < 300) return "Bronze";
+    if (xp < 500) return "Silver";
+    if (xp < 700) return "Gold";
+    if (xp < 1000) return "Sapphire";
+    if (xp < 1500) return "Ruby";
+    if (xp < 2500) return "Emerald";
+    if (xp < 3500) return "Amethyst";
+    if (xp < 5000) return "Pearl";
+    if (xp < 8000) return "Obsidian";
+    return "Diamond";
+  };
+
+  // League Colors helper for the UI
+  const getLeagueColor = (league: string) => {
+    const colors: any = {
+      "Bronze": "text-[#CD7F32]",
+      "Silver": "text-[#C0C0C0]",
+      "Gold": "text-[#FFD700]",
+      "Sapphire": "text-[#0F52BA]",
+      "Ruby": "text-[#E0115F]",
+      "Emerald": "text-[#50C878]",
+      "Amethyst": "text-[#9966CC]",
+      "Pearl": "text-[#EAE0C8]",
+      "Obsidian": "text-[#3B3C36]",
+      "Diamond": "text-[#B9F2FF]"
+    };
+    return colors[league] || "text-[#1CB0F6]";
   };
 
   if (isLoading) {
@@ -66,6 +95,8 @@ export default function ProfilePage() {
       </div>
     );
   }
+
+  const currentLeague = calculateLeague(profileData?.xp_total || 0);
 
   return (
     <div className="max-w-6xl mx-auto flex flex-col lg:flex-row gap-8 py-8 px-4 animate-in fade-in duration-500">
@@ -91,8 +122,9 @@ export default function ProfilePage() {
             <h1 className="text-3xl font-black text-slate-700">{profileData?.username || "Learner"}</h1>
             <p className="text-slate-500 font-bold text-lg">@{profileData?.username || "user"}</p>
             
-            <p className="text-[#CE82FF] font-bold uppercase tracking-widest text-sm mt-3 flex items-center gap-2">
-              <BrainCircuit size={16} strokeWidth={3} /> {profileData?.player_type} Profile
+            {/* 🔥 League Badge replaces old Player Type */}
+            <p className={`font-bold uppercase tracking-widest text-sm mt-3 flex items-center gap-2 ${getLeagueColor(currentLeague)}`}>
+              <Trophy size={18} strokeWidth={3} /> {currentLeague} League
             </p>
             
             <div className="flex items-center gap-6 mt-6">
@@ -130,9 +162,9 @@ export default function ProfilePage() {
             </div>
 
             <div className="border-2 border-slate-200 rounded-2xl p-4 flex items-center gap-4">
-              <Shield size={28} strokeWidth={3} className="text-[#1CB0F6]" fill="currentColor" />
+              <Shield size={28} strokeWidth={3} className={`fill-current ${getLeagueColor(currentLeague)}`} />
               <div>
-                <div className="text-xl font-black text-slate-700">{calculateLeague(profileData?.xp_total || 0)}</div>
+                <div className="text-xl font-black text-slate-700">{currentLeague}</div>
                 <div className="text-sm font-bold text-slate-400">Current league</div>
               </div>
             </div>
@@ -204,12 +236,12 @@ export default function ProfilePage() {
             {socialData.friends.length > 0 ? (
               socialData.friends.map((friend, i) => (
                 <div key={i} className="flex items-center gap-4 p-3 hover:bg-slate-100 rounded-xl cursor-pointer transition-colors">
-                  <div className={`w-12 h-12 rounded-full ${friend.color} flex items-center justify-center font-black text-white text-lg`}>
-                    {friend.initials}
+                  <div className={`w-12 h-12 rounded-full ${friend.color || 'bg-slate-300'} flex items-center justify-center font-black text-white text-lg`}>
+                    {friend.initials || friend.name?.charAt(0) || '?'}
                   </div>
                   <div className="flex-1">
                     <h4 className="font-black text-slate-700">{friend.name}</h4>
-                    <p className="text-sm font-bold text-slate-400">{friend.xp}</p>
+                    <p className="text-sm font-bold text-slate-400">{friend.xp || 0} XP</p>
                   </div>
                 </div>
               ))

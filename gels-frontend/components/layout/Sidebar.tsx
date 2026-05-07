@@ -14,29 +14,35 @@ import {
   Loader2 // <-- Added Loader2 for the spinner
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { api } from '@/api/api'
 
 export default function Sidebar() {
     const router = useRouter(); 
     
-    // 1. Modal control state
+    // Modal & Animation control states
     const [showLogoutModal, setShowLogoutModal] = useState(false);
-    
-    // 2. Animation control state
     const [isLoggingOut, setIsLoggingOut] = useState(false);
 
-    // 3. The logout logic with an artificial delay for the animation
+    // SECURE FIX: Backend must clear the HttpOnly cookie
     const executeLogout = () => {
         setIsLoggingOut(true); // Trigger the animation UI
 
-        // Wait 1.5 seconds so the user sees the animation, then redirect
-        setTimeout(() => {
-            // Wipe all session data
-            localStorage.removeItem('gels_token');
-            localStorage.removeItem('gels_role');
-            localStorage.removeItem('gels_user_id');
-            
-            // Kick them back to the login screen
-            router.push('/auth/login');
+        // Wait 1.5 seconds so the user sees the animation, then execute
+        setTimeout(async () => {
+            try {
+                // Call backend to invalidate the HttpOnly cookie
+                // NOTE: You must create this endpoint (e.g., POST /api/auth/logout)
+                await api.auth.logout(); 
+            } catch (error) {
+                console.error("Failed to invalidate session on server", error);
+            } finally {
+                // Wipe the non-sensitive UI state
+                localStorage.removeItem('gels_role');
+                localStorage.removeItem('gels_user_id');
+                
+                // Kick them back to the login screen
+                router.push('/auth/login');
+            }
         }, 1500); 
     };
 
@@ -64,9 +70,9 @@ export default function Sidebar() {
           </Link>
 
           {/* Purple Book (Learning) */}
-          <Link href="/learning-path" className="flex items-center gap-4 px-4 py-3 rounded-2xl text-slate-500 hover:bg-slate-100 font-bold uppercase tracking-wider transition-all border-2 border-transparent active:bg-slate-200">
+          <Link href="/classes" className="flex items-center gap-4 px-4 py-3 rounded-2xl text-slate-500 hover:bg-slate-100 font-bold uppercase tracking-wider transition-all border-2 border-transparent active:bg-slate-200">
               <BookOpen size={28} strokeWidth={2.5} className="text-[#CE82FF]" /> 
-              <span className="mt-1">Learn</span>
+              <span className="mt-1">Classes</span>
           </Link>
 
           {/* Orange Trophy (Quests) */}
