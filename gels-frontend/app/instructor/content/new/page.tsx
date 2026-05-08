@@ -1,78 +1,130 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { ArrowLeft, Save, FileText, Clock, Hash, Target, Sparkles, AlertTriangle, Flame, Loader2, UploadCloud, File as FileIcon } from 'lucide-react';
+import { ArrowLeft, Save, FolderTree, Target, FileIcon, UploadCloud, Loader2, AlertCircle } from 'lucide-react';
+import { api } from '@/api/api';
 
-export default function AddModulePage() {
-  const router = useRouter();
+export default function AddNodePage() {
+  const [pathData, setPathData] = useState<any>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   
-  // Text fields state
+  // 🔥 ADDED MISSING STATE VARIABLES
+  const [instructorId, setInstructorId] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
+
   const [formData, setFormData] = useState({
-    title: '',
-    name: '',
-    topic_id: '',
-    difficulty: 'EASY',
-    estimated_minutes: 15,
+    section_id: '',
+    unit_id: '',
+    icon_type: 'star',
+    title: ''
   });
 
-  // File state for local upload tracking
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  // 1. Fetch Dynamic Database Hierarchy
+  useEffect(() => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s Timeout
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
+    const fetchTree = async () => {
+      try {
+        const userId = localStorage.getItem('gels_user_id');
+        if (!userId || userId === "undefined") {
+          setIsLoading(false);
+          return;
+        }
 
-  const setDifficulty = (level: string) => {
-    setFormData({ ...formData, difficulty: level });
-  };
+        setInstructorId(userId);
+        setIsLoading(true);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setSelectedFile(e.target.files[0]);
+        const paths = await api.learning.getAllPaths(userId);
+        
+        if (paths && paths.length > 0) {
+          const fullTree = await api.learning.getFullPath(paths[0].id);
+          setPathData(fullTree);
+          
+          if (fullTree?.sections?.length > 0) {
+            // Pre-select first section and expand it
+            setFormData(prev => ({ ...prev, section_id: fullTree.sections[0].section_id }));
+            setExpandedSections({ [fullTree.sections[0].section_id]: true });
+          }
+        } else {
+          setPathData(null);
+        }
+      } catch (err) {
+        console.error("Fetch failed or timed out:", err);
+        setError("The database took too long to respond. Please check your connection.");
+      } finally {
+        clearTimeout(timeoutId);
+        setIsLoading(false);
+      }
+    };
+
+    fetchTree();
+    return () => controller.abort();
+  }, []);
+
+  // 2. Dynamically calculate which Units belong to the chosen Section
+  const activeSection = pathData?.sections?.find((s: any) => s.section_id === formData.section_id);
+  const availableUnits = activeSection?.units || [];
+
+  // 3. Auto-select the first Unit when the Section changes
+  useEffect(() => {
+    if (availableUnits.length > 0) {
+      setFormData(prev => ({ ...prev, unit_id: availableUnits[0].unit_id }));
+    } else {
+      setFormData(prev => ({ ...prev, unit_id: '' }));
     }
-  };
+  }, [formData.section_id, activeSection]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedFile) {
-      alert("Please upload a local asset file so the Affective Engine can track user readability.");
+      alert("Please upload source material.");
+      return;
+    }
+    if (!formData.unit_id) {
+      alert("Please select a valid parent unit.");
       return;
     }
 
     setIsSubmitting(true);
     try {
-      // Create FormData to send the file + text data to FastAPI
       const payload = new FormData();
+      payload.append("unit_id", formData.unit_id);
+      payload.append("icon_type", formData.icon_type);
       payload.append("title", formData.title);
-      payload.append("name", formData.name);
-      payload.append("topic_id", formData.topic_id);
-      payload.append("difficulty", formData.difficulty);
-      payload.append("estimated_minutes", formData.estimated_minutes.toString());
-      payload.append("file", selectedFile); // Attach the actual file
+      payload.append("file", selectedFile);
 
-      // Bypass api.ts for this specific request to handle multipart/form-data natively
-      const response = await fetch('http://localhost:8000/api/instructor/modules', {
+      const response = await fetch('http://localhost:8000/api/learning/path-node', {
         method: 'POST',
         body: payload,
       });
 
-      if (!response.ok) throw new Error("Upload failed");
+      if (!response.ok) throw new Error("Database injection failed");
       
-      router.push('/instructor/content');
+      window.location.href = '/instructor/content';
     } catch (err) {
-      console.error("Failed to create module", err);
-      alert("Failed to save module. Check backend logs.");
+      console.error(err);
+      alert("Failed to inject node into path.");
       setIsSubmitting(false);
     }
   };
 
+  if (error) {
+    return (
+      <div className="py-20 flex flex-col items-center justify-center font-sans">
+        <AlertCircle size={48} className="text-[#FF4B4B] mb-4" strokeWidth={2.5} />
+        <p className="font-bold text-[#FF4B4B]">{error}</p>
+        <button onClick={() => window.location.reload()} className="mt-4 text-slate-500 font-bold underline">Retry</button>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-4xl">
-      
-      {/* Header & Back Button */}
+    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-4xl font-sans">
       <div className="flex items-center gap-4 border-b-4 border-slate-200 pb-6">
         <Link 
           href="/instructor/content" 
@@ -81,177 +133,118 @@ export default function AddModulePage() {
           <ArrowLeft size={24} strokeWidth={3} />
         </Link>
         <div>
-          <h1 className="text-3xl font-black text-slate-700 uppercase tracking-tight">Create New Module</h1>
-          <p className="text-slate-500 font-bold mt-1">Configure curriculum data for the Cognitive Engine.</p>
+          <h1 className="text-3xl font-black text-slate-700 uppercase tracking-tight">Add Lesson Node</h1>
+          <p className="text-slate-500 font-bold mt-1">Insert a new stepping stone into the curriculum path.</p>
         </div>
       </div>
 
       <form onSubmit={handleSubmit} className="bg-white border-2 border-slate-200 rounded-3xl p-6 sm:p-8 shadow-[0_6px_0_0_#E5E5E5] space-y-8">
-        
-        {/* --- SECTION 1: Basic Details --- */}
         <div className="space-y-6">
           <h2 className="text-xl font-black text-slate-700 uppercase tracking-widest flex items-center gap-2">
-            <FileText className="text-[#1CB0F6]" size={24} strokeWidth={3} /> Core Details
+            <FolderTree className="text-[#CE82FF]" size={24} strokeWidth={3} /> Path Placement
           </h2>
           
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <label className="text-sm font-black text-slate-500 uppercase tracking-widest pl-1">Module ID (e.g. Unit 4.1)</label>
-              <div className="relative group">
-                <Hash className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#1CB0F6] transition-colors" size={20} strokeWidth={3} />
-                <input 
-                  type="text" name="title" required placeholder="Unit 4.1"
-                  value={formData.title} onChange={handleInputChange}
-                  className="w-full bg-slate-100 border-2 border-slate-200 rounded-2xl pl-12 pr-4 py-3.5 text-base font-bold text-slate-700 focus:outline-none focus:border-[#1CB0F6] focus:bg-white transition-all placeholder-slate-400"
-                />
+          {isLoading ? (
+            <div className="flex items-center gap-3 text-slate-400 font-bold">
+               <Loader2 className="animate-spin" size={20}/> Fetching Database Hierarchy...
+            </div>
+          ) : !pathData ? (
+            <div className="p-4 bg-amber-50 border-2 border-amber-200 rounded-2xl text-amber-700 font-bold">
+                No course paths found. Please create a Course and Section first in the Content Manager.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <label className="text-sm font-black text-slate-500 uppercase tracking-widest pl-1">Parent Section</label>
+                <select 
+                  value={formData.section_id}
+                  onChange={(e) => setFormData({...formData, section_id: e.target.value})}
+                  className="w-full bg-slate-100 border-2 border-slate-200 rounded-2xl px-4 py-3.5 text-base font-bold text-slate-700 focus:outline-none focus:border-[#CE82FF] transition-all appearance-none"
+                >
+                  {pathData.sections?.map((sec: any) => (
+                    <option key={sec.section_id} value={sec.section_id}>{sec.title}</option>
+                  ))}
+                </select>
               </div>
-            </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-black text-slate-500 uppercase tracking-widest pl-1">Display Name</label>
-              <div className="relative group">
-                <FileText className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#1CB0F6] transition-colors" size={20} strokeWidth={3} />
-                <input 
-                  type="text" name="name" required placeholder="Intro to Data Structures"
-                  value={formData.name} onChange={handleInputChange}
-                  className="w-full bg-slate-100 border-2 border-slate-200 rounded-2xl pl-12 pr-4 py-3.5 text-base font-bold text-slate-700 focus:outline-none focus:border-[#1CB0F6] focus:bg-white transition-all placeholder-slate-400"
-                />
+              <div className="space-y-2">
+                <label className="text-sm font-black text-slate-500 uppercase tracking-widest pl-1">Parent Unit</label>
+                <select 
+                  value={formData.unit_id}
+                  onChange={(e) => setFormData({...formData, unit_id: e.target.value})}
+                  disabled={availableUnits.length === 0}
+                  className="w-full bg-slate-100 border-2 border-slate-200 rounded-2xl px-4 py-3.5 text-base font-bold text-slate-700 focus:outline-none focus:border-[#CE82FF] transition-all appearance-none disabled:opacity-50"
+                >
+                  {availableUnits.map((unit: any) => (
+                    <option key={unit.unit_id} value={unit.unit_id}>{unit.title}</option>
+                  ))}
+                </select>
               </div>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-black text-slate-500 uppercase tracking-widest pl-1">Topic Category</label>
-              <div className="relative group">
-                <Target className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#1CB0F6] transition-colors" size={20} strokeWidth={3} />
-                <input 
-                  type="text" name="topic_id" required placeholder="Arrays"
-                  value={formData.topic_id} onChange={handleInputChange}
-                  className="w-full bg-slate-100 border-2 border-slate-200 rounded-2xl pl-12 pr-4 py-3.5 text-base font-bold text-slate-700 focus:outline-none focus:border-[#1CB0F6] focus:bg-white transition-all placeholder-slate-400"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-black text-slate-500 uppercase tracking-widest pl-1">Est. Minutes to Complete</label>
-              <div className="relative group">
-                <Clock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#1CB0F6] transition-colors" size={20} strokeWidth={3} />
-                <input 
-                  type="number" name="estimated_minutes" required placeholder="15" min="1"
-                  value={formData.estimated_minutes} 
-                  onChange={(e) => setFormData({ ...formData, estimated_minutes: parseInt(e.target.value) })}
-                  className="w-full bg-slate-100 border-2 border-slate-200 rounded-2xl pl-12 pr-4 py-3.5 text-base font-bold text-slate-700 focus:outline-none focus:border-[#1CB0F6] focus:bg-white transition-all placeholder-slate-400"
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <hr className="border-t-2 border-slate-100" />
-
-        {/* --- SECTION 2: AI Parameters --- */}
-        <div className="space-y-6">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-black text-slate-700 uppercase tracking-widest flex items-center gap-2">
-              <Sparkles className="text-[#CE82FF]" size={24} strokeWidth={3} /> AI Parameters
-            </h2>
-          </div>
-          
-          <div className="space-y-3">
-            <label className="text-sm font-black text-slate-500 uppercase tracking-widest pl-1">Baseline Difficulty</label>
-            
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <button 
-                type="button" onClick={() => setDifficulty('EASY')}
-                className={`p-5 rounded-2xl border-2 flex flex-col items-center text-center transition-all ${formData.difficulty === 'EASY' ? 'bg-[#58CC02]/10 border-[#58CC02] border-b-4 transform -translate-y-1 shadow-[0_4px_0_0_#46A302]' : 'bg-white border-slate-200 hover:bg-slate-50'}`}
-              >
-                <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-2 ${formData.difficulty === 'EASY' ? 'bg-[#58CC02] text-white' : 'bg-slate-100 text-slate-400'}`}>
-                  <Sparkles size={24} strokeWidth={2.5} />
-                </div>
-                <span className={`font-black uppercase tracking-widest ${formData.difficulty === 'EASY' ? 'text-[#58CC02]' : 'text-slate-500'}`}>Easy</span>
-              </button>
-
-              <button 
-                type="button" onClick={() => setDifficulty('MEDIUM')}
-                className={`p-5 rounded-2xl border-2 flex flex-col items-center text-center transition-all ${formData.difficulty === 'MEDIUM' ? 'bg-[#FF9600]/10 border-[#FF9600] border-b-4 transform -translate-y-1 shadow-[0_4px_0_0_#D97A00]' : 'bg-white border-slate-200 hover:bg-slate-50'}`}
-              >
-                <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-2 ${formData.difficulty === 'MEDIUM' ? 'bg-[#FF9600] text-white' : 'bg-slate-100 text-slate-400'}`}>
-                  <Flame size={24} strokeWidth={2.5} />
-                </div>
-                <span className={`font-black uppercase tracking-widest ${formData.difficulty === 'MEDIUM' ? 'text-[#FF9600]' : 'text-slate-500'}`}>Medium</span>
-              </button>
-
-              <button 
-                type="button" onClick={() => setDifficulty('HARD')}
-                className={`p-5 rounded-2xl border-2 flex flex-col items-center text-center transition-all ${formData.difficulty === 'HARD' ? 'bg-[#FF4B4B]/10 border-[#FF4B4B] border-b-4 transform -translate-y-1 shadow-[0_4px_0_0_#D0021B]' : 'bg-white border-slate-200 hover:bg-slate-50'}`}
-              >
-                <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-2 ${formData.difficulty === 'HARD' ? 'bg-[#FF4B4B] text-white' : 'bg-slate-100 text-slate-400'}`}>
-                  <AlertTriangle size={24} strokeWidth={2.5} />
-                </div>
-                <span className={`font-black uppercase tracking-widest ${formData.difficulty === 'HARD' ? 'text-[#FF4B4B]' : 'text-slate-500'}`}>Hard</span>
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <hr className="border-t-2 border-slate-100" />
-
-        {/* --- SECTION 3: NATIVE FILE UPLOAD --- */}
-        <div className="space-y-6">
-          <h2 className="text-xl font-black text-slate-700 uppercase tracking-widest flex items-center gap-2">
-            <UploadCloud className="text-[#FF9600]" size={24} strokeWidth={3} /> Local Asset Upload
-          </h2>
-          
-          <div className="space-y-2">
-            <p className="text-sm font-bold text-slate-500 leading-relaxed mb-2">
-              Upload the module content (.md, .pdf, or .mp4). By hosting this locally, the Affective Engine can actively track read-time, scroll depth, and engagement rates to adapt the curriculum.
-            </p>
-            
-            <div className="relative border-2 border-dashed border-slate-300 rounded-3xl p-10 bg-slate-50 flex flex-col items-center justify-center hover:bg-slate-100 transition-colors group cursor-pointer">
-              <input 
-                type="file" 
-                onChange={handleFileChange}
-                accept=".md,.pdf,.mp4"
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" 
-              />
               
-              {selectedFile ? (
-                <div className="flex flex-col items-center text-center">
-                  <div className="w-16 h-16 bg-[#58CC02]/10 text-[#58CC02] rounded-full flex items-center justify-center mb-4 border-2 border-[#58CC02]/20">
-                    <FileIcon size={32} strokeWidth={2.5} />
-                  </div>
-                  <h3 className="font-black text-slate-700 text-lg">{selectedFile.name}</h3>
-                  <p className="text-slate-500 font-bold text-sm mt-1">Ready for upload ({(selectedFile.size / 1024 / 1024).toFixed(2)} MB)</p>
-                </div>
-              ) : (
-                <div className="flex flex-col items-center text-center">
-                  <div className="w-16 h-16 bg-[#FF9600]/10 text-[#FF9600] rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform border-2 border-[#FF9600]/20">
-                    <UploadCloud size={32} strokeWidth={2.5} />
-                  </div>
-                  <h3 className="font-black text-slate-700 text-lg">Click to browse or drag file here</h3>
-                  <p className="text-slate-500 font-bold text-sm mt-1">Markdown, PDF, or MP4 Video</p>
-                </div>
-              )}
+              <div className="space-y-2">
+                <label className="text-sm font-black text-slate-500 uppercase tracking-widest pl-1">Level Type</label>
+                <select 
+                  value={formData.icon_type}
+                  onChange={(e) => setFormData({...formData, icon_type: e.target.value})}
+                  className="w-full bg-slate-100 border-2 border-slate-200 rounded-2xl px-4 py-3.5 text-base font-bold text-slate-700 focus:outline-none focus:border-[#CE82FF] transition-all appearance-none"
+                >
+                  <option value="star">⭐ Standard Lesson (Star)</option>
+                  <option value="book">📖 Story/Reading (Book)</option>
+                  <option value="dumbbell">💪 Practice (Dumbbell)</option>
+                  <option value="trophy">🏆 Unit Review (Trophy)</option>
+                </select>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-black text-slate-500 uppercase tracking-widest pl-1">Lesson Title</label>
+                <input 
+                  type="text" required placeholder="e.g., Arrays vs Lists" 
+                  value={formData.title}
+                  onChange={(e) => setFormData({...formData, title: e.target.value})}
+                  className="w-full bg-slate-100 border-2 border-slate-200 rounded-2xl px-4 py-3.5 text-base font-bold text-slate-700 focus:outline-none focus:border-[#CE82FF] transition-all placeholder-slate-400" 
+                />
+              </div>
             </div>
+          )}
+        </div>
+
+        <hr className="border-t-2 border-slate-100" />
+
+        {/* Source Material */}
+        <div className="space-y-6">
+          <h2 className="text-xl font-black text-slate-700 uppercase tracking-widest flex items-center gap-2">
+            <Target className="text-[#FF9600]" size={24} strokeWidth={3} /> Source Material
+          </h2>
+          <p className="text-sm font-bold text-slate-500 leading-relaxed">
+            Upload the content for this node. The AI will slice this into bite-sized questions for the user.
+          </p>
+          
+          <div className="relative border-2 border-dashed border-slate-300 rounded-3xl p-10 bg-slate-50 flex flex-col items-center justify-center hover:bg-slate-100 transition-colors group cursor-pointer">
+            <input type="file" onChange={(e) => setSelectedFile(e.target.files?.[0] || null)} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
+            
+            {selectedFile ? (
+              <div className="flex flex-col items-center text-center">
+                <div className="w-16 h-16 bg-[#58CC02]/10 text-[#58CC02] rounded-full flex items-center justify-center mb-4 border-2 border-[#58CC02]/20">
+                  <FileIcon size={32} strokeWidth={2.5} />
+                </div>
+                <h3 className="font-black text-slate-700 text-lg">{selectedFile.name}</h3>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center text-center">
+                <div className="w-16 h-16 bg-[#FF9600]/10 text-[#FF9600] rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform border-2 border-[#FF9600]/20">
+                  <UploadCloud size={32} strokeWidth={2.5} />
+                </div>
+                <h3 className="font-black text-slate-700 text-lg">Click to browse or drag file here</h3>
+                <p className="text-slate-500 font-bold text-sm mt-1">Markdown, PDF, or MP4 Video</p>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Submit Actions */}
-        <div className="pt-6 border-t-2 border-slate-100 flex flex-col sm:flex-row justify-end gap-4">
-          <Link 
-            href="/instructor/content"
-            className="px-8 py-4 rounded-2xl text-base font-black uppercase tracking-widest text-slate-500 border-2 border-slate-200 hover:bg-slate-50 transition-all text-center"
-          >
-            Cancel
-          </Link>
-          <button 
-            type="submit" 
-            disabled={isSubmitting}
-            className={`text-white px-8 py-4 rounded-2xl text-base font-black uppercase tracking-widest transition-all border-b-4 flex items-center justify-center gap-2 ${
-              isSubmitting ? 'bg-slate-300 border-slate-400 cursor-wait' : 'bg-[#58CC02] border-[#46A302] hover:bg-[#46A302] active:translate-y-1 active:border-b-0'
-            }`}
-          >
-            {isSubmitting ? <Loader2 size={20} strokeWidth={3} className="animate-spin" /> : <Save size={20} strokeWidth={3} />} 
-            Save & Upload
+        <div className="pt-6 border-t-2 border-slate-100 flex justify-end">
+          <button type="submit" disabled={isSubmitting || isLoading || !pathData} className="text-white px-8 py-4 rounded-2xl text-base font-black uppercase tracking-widest transition-all border-b-4 flex items-center gap-2 bg-[#58CC02] border-[#46A302] hover:bg-[#46A302] active:translate-y-1 active:border-b-0 disabled:opacity-50">
+            {isSubmitting ? <Loader2 size={20} className="animate-spin" /> : <Save size={20} strokeWidth={3} />} 
+            Save to Path
           </button>
         </div>
       </form>

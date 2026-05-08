@@ -70,9 +70,9 @@ export default function Sidebar() {
           </Link>
 
           {/* Purple Book (Learning) */}
-          <Link href="/classes" className="flex items-center gap-4 px-4 py-3 rounded-2xl text-slate-500 hover:bg-slate-100 font-bold uppercase tracking-wider transition-all border-2 border-transparent active:bg-slate-200">
+          <Link href="/learning-path" className="flex items-center gap-4 px-4 py-3 rounded-2xl text-slate-500 hover:bg-slate-100 font-bold uppercase tracking-wider transition-all border-2 border-transparent active:bg-slate-200">
               <BookOpen size={28} strokeWidth={2.5} className="text-[#CE82FF]" /> 
-              <span className="mt-1">Classes</span>
+              <span className="mt-1">Learn</span>
           </Link>
 
           {/* Orange Trophy (Quests) */}

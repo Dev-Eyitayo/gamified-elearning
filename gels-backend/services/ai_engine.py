@@ -107,28 +107,35 @@ def generate_curriculum_from_asset(module_id: str, file_path: str):
         file_content = extract_text_from_file(file_path)
 
         prompt = f"""
-        You are an expert instructional designer for a gamified eLearning app.
-        Analyze the following material:
+        You are an expert instructional designer for a gamified eLearning app similar to Duolingo.
+        Analyze the following educational material:
         ---
         {file_content}
         ---
-        Generate 15 highly engaging, bite-sized learning cards.
-        Each card MUST include a conversational 'lesson_note' that teaches the concept in 1-2 sentences, followed by a multiple-choice question to test it.
-        
-        Output ONLY valid JSON in this exact structure without any markdown blocks:
+        Your goal is to generate 15 highly engaging, bite-sized learning cards. 
+
+        CRITICAL CONSTRAINTS:
+        1. LESSON NOTE: Must be conversational, encouraging, and teach exactly one concept needed to answer the question.
+        2. ANSWER SHUFFLING: You MUST vary the position of the 'isCorrect': true option. Do NOT always make the first option correct. Randomize the placement of the correct answer across the 15 cards (some at index 0, some at index 2, etc.).
+        3. DISTRACTORS: All incorrect options must be plausible and related to the material.
+        4. STRUCTURE: Output ONLY valid raw JSON. No markdown backticks, no preamble.
+
+        JSON STRUCTURE:
         [
           {{
-            "lesson_note": "A fun, encouraging explanation.",
-            "question": "The engaging question text here?",
-            "difficulty": "EASY",
+            "lesson_note": "Hey! Did you know that [Concept] works like this? It's super useful for [Context]!",
+            "question": "Based on that, which of these is true?",
+            "difficulty": "MEDIUM",
             "options": [
-              {{"id": 1, "text": "Option A", "isCorrect": true}},
-              {{"id": 2, "text": "Option B", "isCorrect": false}},
-              {{"id": 3, "text": "Option C", "isCorrect": false}},
-              {{"id": 4, "text": "Option D", "isCorrect": false}}
+              {{"id": 1, "text": "Incorrect Choice", "isCorrect": false}},
+              {{"id": 2, "text": "The Correct Answer", "isCorrect": true}},
+              {{"id": 3, "text": "Another Distractor", "isCorrect": false}},
+              {{"id": 4, "text": "Wrong choice", "isCorrect": false}}
             ]
           }}
         ]
+
+        The Correct Answer option Must be Shuffled Across the 4 option and not just be a single option is the answer acrros the adaptive generation.
         """
 
         raw_text = call_openrouter(prompt).strip()

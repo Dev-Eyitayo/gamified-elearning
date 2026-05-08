@@ -1,11 +1,12 @@
 import uuid
-from sqlalchemy import Column, String, Integer, Float, Boolean, ForeignKey, DateTime, Enum as SQLEnum
+from sqlalchemy import Text, Column, String, Integer, Float, Boolean, ForeignKey, DateTime, Enum as SQLEnum
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship
 from datetime import datetime, timezone
 from core.database import Base
 import enum
 from datetime import datetime
+from sqlalchemy.sql import func
 
 class UserRole(str, enum.Enum):
     learner = "learner"
@@ -31,12 +32,11 @@ class User(Base):
     role = Column(SQLEnum(UserRole), default=UserRole.learner, nullable=False)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     last_active = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
-    
-    profile = relationship("LearnerProfile", back_populates="user", uselist=False)
+    profile = relationship("LearnerProfile", back_populates="user", uselist=False, foreign_keys="[LearnerProfile.user_id]")
 
 class LearnerProfile(Base):
     __tablename__ = "learner_profiles"
-    
+    instructor_id = Column(UUID(as_uuid=True), ForeignKey("users.user_id"), nullable=True) # 🔥 Add this
     profile_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.user_id"), nullable=False)
     knowledge_state = Column(JSONB, default=dict) # Map of {topic_id: mastery_score}
@@ -45,13 +45,19 @@ class LearnerProfile(Base):
     xp_total = Column(Integer, default=0)
     current_level = Column(Integer, default=1)
     streak_days = Column(Integer, default=0)
+    last_active_at = Column(DateTime(timezone=True), default=func.now())
     last_updated = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     gems = Column(Integer, default=25)
     last_gem_update = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
-    user = relationship("User", back_populates="profile")
     current_league = Column(String, default="Bronze") # Bronze, Silver, Gold... Diamond
     weekly_xp = Column(Integer, default=0)
     cohort_id = Column(String, nullable=True)
+    instructor_id = Column(UUID(as_uuid=True), ForeignKey("users.user_id"), nullable=True)
+
+    user = relationship("User", back_populates="profile", foreign_keys=[user_id])
+    
+    # 🔥 Explicitly point to instructor_id
+    instructor = relationship("User", foreign_keys=[instructor_id])
 
 class Module(Base):
     __tablename__ = "modules"
@@ -137,3 +143,58 @@ class Notification(Base):
     message = Column(String, nullable=False)
     is_read = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+class CoursePath(Base):
+    __tablename__ = "course_paths"
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    title = Column(String, nullable=False)
+    instructor_id = Column(UUID(as_uuid=True), ForeignKey("users.user_id"), nullable=True)
+    language_or_topic = Column(String) 
+    instructor_id = Column(UUID(as_uuid=True), ForeignKey("users.user_id"), nullable=True)
+    sections = relationship("Section", back_populates="course", cascade="all, delete-orphan", order_by="Section.order_index")
+
+# 2. SECTION (The major chapters / CEFR milestones)
+class Section(Base):
+    __tablename__ = "sections"
+    instructor_id = Column(UUID(as_uuid=True), ForeignKey("users.user_id"), nullable=True)
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    course_id = Column(String, ForeignKey("course_paths.id"))
+    title = Column(String) # e.g., "Section 1: The Basics"
+    order_index = Column(Integer) # To keep them in linear order
+    
+    course = relationship("CoursePath", back_populates="sections")
+    units = relationship("Unit", back_populates="section", cascade="all, delete-orphan", order_by="Unit.order_index")
+
+# 3. UNIT (Themed episodes)
+class Unit(Base):
+    __tablename__ = "units"
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    section_id = Column(String, ForeignKey("sections.id"))
+    title = Column(String) # e.g., "Talk about components"
+    guidebook_text = Column(Text, nullable=True) # The grammar/concept guide
+    order_index = Column(Integer)
+    theme_color = Column(String, default="#1CB0F6") # Unit background color
+    
+    section = relationship("Section", back_populates="units")
+    levels = relationship("Level", back_populates="unit", cascade="all, delete-orphan", order_by="Level.order_index")
+
+# 4. LEVEL (The Bubbles / Stepping Stones)
+class Level(Base):
+    __tablename__ = "levels"
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    unit_id = Column(String, ForeignKey("units.id"))
+    icon_type = Column(String, default="star") # "star", "book" (story), "dumbbell" (practice), "trophy" (review)
+    order_index = Column(Integer)
+    
+    unit = relationship("Unit", back_populates="levels")
+    lessons = relationship("Lesson", back_populates="level", cascade="all, delete-orphan", order_by="Lesson.order_index")
+
+# 5. LESSON (The actual session containing the exercises/questions)
+class Lesson(Base):
+    __tablename__ = "lessons"
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    level_id = Column(String, ForeignKey("levels.id"))
+    title = Column(String)
+    order_index = Column(Integer)
+    
+    level = relationship("Level", back_populates="lessons")

@@ -1,3 +1,8 @@
 .env
 *.env
 gels-backend/.env
+gels-backend/uploads/
+gels-backend/fix_db.py
+gels-backend/fix_leagues.py
+gels-backend/fix_db.py
+gels-backend/fix_leagues_db.py

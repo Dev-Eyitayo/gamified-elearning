@@ -9,60 +9,62 @@ router = APIRouter(prefix="/api/gamification", tags=["Affective Engine"])
 
 @router.get("/profile")
 def get_profile(user_id: str, db: Session = Depends(get_db)):
-    """Fetches the user's gamification stats AND calculates Gem Refills"""
+    """Fetches user stats and manages the 24-hour Gem Refill cycle"""
     
+    # Safety check for frontend 'undefined' strings
+    if user_id == "undefined" or not user_id:
+        raise HTTPException(status_code=400, detail="Invalid User ID")
+
     profile = db.query(LearnerProfile).filter(LearnerProfile.user_id == user_id).first()
     user = db.query(User).filter(User.user_id == user_id).first()
     
     if not profile or not user:
         raise HTTPException(status_code=404, detail="Profile not found")
 
-    # --- 🔥 DYNAMIC GEM REFILL LOGIC ---
+    # --- 🔥 DYNAMIC GEM REFILL LOGIC (Duolingo Style) ---
     MAX_GEMS = 25
-    SECONDS_PER_GEM = 86400 / 25  # 24 hours / 25 gems = 3456 seconds per gem
+    SECONDS_PER_GEM = 86400 / 25  # Refill 25 gems over 24 hours
 
     if profile.gems < MAX_GEMS:
         now = datetime.now(timezone.utc)
-        
-        # Ensure timezone safety
         last_update = profile.last_gem_update
+        
         if last_update.tzinfo is None:
             last_update = last_update.replace(tzinfo=timezone.utc)
 
         time_passed = (now - last_update).total_seconds()
         
         if time_passed >= SECONDS_PER_GEM:
-            # Calculate how many full gems they earned while they were gone
             gems_earned = int(time_passed // SECONDS_PER_GEM)
             new_gem_count = min(MAX_GEMS, profile.gems + gems_earned)
             
             profile.gems = new_gem_count
             
-            # Advance the timer by the exact chunks of time used
             if new_gem_count == MAX_GEMS:
-                profile.last_gem_update = now # Reset timer fully
+                profile.last_gem_update = now
             else:
                 profile.last_gem_update += timedelta(seconds=gems_earned * SECONDS_PER_GEM)
             
-            db.commit() # Save the newly generated gems!
+            db.commit()
 
-    username = user.email.split('@')[0]
-    
     return {
-        "username": username,
+        "username": user.email.split('@')[0],
         "email": user.email,
         "xp_total": profile.xp_total,
         "streak_days": profile.streak_days,
-        "player_type": profile.player_type.value,
+        "player_type": profile.player_type.value if hasattr(profile.player_type, 'value') else profile.player_type,
         "current_level": profile.current_level,
         "engagement_score": profile.engagement_score,
-        "gems": profile.gems  # <-- Return the gems to the frontend
+        "gems": profile.gems
     }
 
 @router.get("/leaderboard")
 def get_leaderboard(scope: str = "global", player_type: str = None, db: Session = Depends(get_db)):
-    """US-004 & PRD 4.2.2: Contextual leaderboard"""
-    query = db.query(User.email, LearnerProfile.xp_total, LearnerProfile.player_type, LearnerProfile.user_id).join(LearnerProfile)
+    """US-004: Contextual leaderboard with Explicit Join Path to avoid Ambiguity"""
+    
+    # 🔥 FIX: Explicitly join on user_id to resolve AmbiguousForeignKeysError
+    query = db.query(User.email, LearnerProfile.xp_total, LearnerProfile.player_type, LearnerProfile.user_id)\
+              .join(LearnerProfile, User.user_id == LearnerProfile.user_id)
     
     if scope == "private" and player_type:
         query = query.filter(LearnerProfile.player_type == player_type)
@@ -72,17 +74,16 @@ def get_leaderboard(scope: str = "global", player_type: str = None, db: Session 
     return {"entries": [
         {
             "user_id": str(l.user_id), 
-            "username": l.email.split('@')[0], 
+            "username": l.email.split('@')[0].replace('.', ' ').title(), 
             "xp": l.xp_total, 
-            "type": l.player_type.value
+            "type": l.player_type.value if hasattr(l.player_type, 'value') else l.player_type
         } for l in leaders
     ]}
 
 @router.get("/quests")
 def get_active_quests(db: Session = Depends(get_db)):
-    """PRD 4.2.2: Fetch active quests dynamically from the database"""
+    """Fetch active daily quests"""
     active_quests = db.query(Quest).filter(Quest.is_active == True).all()
-    
     return [
         {
             "id": str(q.quest_id), 
@@ -91,8 +92,7 @@ def get_active_quests(db: Session = Depends(get_db)):
             "description": q.description,
             "reward_xp": q.reward_xp, 
             "status": "active"
-        } 
-        for q in active_quests
+        } for q in active_quests
     ]
 
 @router.get("/achievements")
@@ -160,10 +160,16 @@ def get_notifications(user_id: str, db: Session = Depends(get_db)):
 
 @router.get("/social")
 def get_social_data(user_id: str, db: Session = Depends(get_db)):
-    """Dynamically fetches peers and recent social feed events"""
+    """Fetches cohort activity feed and friends with explicit join condition"""
     
-    # 1. Fetch up to 4 other users from the database to act as the "Cohort/Friends"
-    peers = db.query(User.email, LearnerProfile.xp_total).join(LearnerProfile).filter(User.user_id != user_id).limit(4).all()
+    if user_id == "undefined" or not user_id:
+        return {"friends": [], "feed": []}
+
+    # 🔥 FIX: Added explicit onclause
+    peers = db.query(User.email, LearnerProfile.xp_total)\
+        .join(LearnerProfile, User.user_id == LearnerProfile.user_id)\
+        .filter(User.user_id != user_id)\
+        .limit(4).all()
     
     friends_list = []
     colors = ["bg-[#58CC02]", "bg-[#CE82FF]", "bg-[#FF9600]", "bg-[#1CB0F6]"]
@@ -177,7 +183,6 @@ def get_social_data(user_id: str, db: Session = Depends(get_db)):
             "color": colors[i % len(colors)]
         })
 
-    # 2. Generate a dynamic feed based on the top peer's activity
     feed = []
     if friends_list:
         top_peer = friends_list[0]
@@ -189,7 +194,4 @@ def get_social_data(user_id: str, db: Session = Depends(get_db)):
             "message": f"Just reached {top_peer['xp']} and is climbing the leaderboard!"
         })
 
-    return {
-        "friends": friends_list,
-        "feed": feed
-    }
+    return {"friends": friends_list, "feed": feed}

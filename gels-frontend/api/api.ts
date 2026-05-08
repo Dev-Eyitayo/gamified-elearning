@@ -94,15 +94,31 @@ export const api = {
       }
     }
   },
-  
+
   // 2. LEARNING & ONBOARDING
   learning: {
+    // Replace getAllPaths and add these under the `learning:` object
+  getAllPaths: (instructorId: string) => fetchAPI(`/learning/learning-paths?instructor_id=${instructorId}`, { method: 'GET' }),
+  createCourse: (data: any) => fetchAPI('/learning/course', { method: 'POST', body: JSON.stringify(data) }),
+  createSection: (data: any) => fetchAPI('/learning/section', { method: 'POST', body: JSON.stringify(data) }),
+  createUnit: (data: any) => fetchAPI('/learning/unit', { method: 'POST', body: JSON.stringify(data) }),
     getLesson: (moduleName: string, lessonId: string) => fetchAPI(`/learning/${moduleName}/${lessonId}?t=${new Date().getTime()}`, { method: 'GET' }),
     getOnboardingConfig: () => fetchAPI('/learning/onboarding-config', { method: 'GET' }),
     getQuestion: () => fetchAPI(`/learning/question?t=${new Date().getTime()}`, { method: 'GET' }),    
     completeOnboarding: (data: any) => fetchAPI('/learning/onboarding', { method: 'POST', body: JSON.stringify(data) }),
     getModules: () => fetchAPI('/learning/modules', { method: 'GET' }),
-    submitAssessment: (userId: string, data: any) => fetchAPI(`/learning/submit-assessment?user_id=${userId}`, { method: 'POST', body: JSON.stringify(data) }),
+    // getAllPaths: () => fetchAPI('/learning/learning-paths', { method: 'GET' }),
+    getFullPath: (courseId: string) => fetchAPI(`/learning/learning-path/${courseId}`, { method: 'GET' }),
+    submitAssessment: (data: { 
+        user_id: string, 
+        score: number, 
+        remaining_gems: number, 
+        time_spent_seconds: number, 
+        attempts: number 
+    }) => fetchAPI('/learning/submit-assessment', { 
+        method: 'POST', 
+        body: JSON.stringify(data) 
+    }),
     getNextModule: (userId: string) => fetchAPI(`/learning/next-module?user_id=${userId}`, { method: 'GET' })
   },
 

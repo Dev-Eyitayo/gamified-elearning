@@ -1,26 +1,11 @@
-from core.database import engine
-from sqlalchemy import text
+from core.database import engine, Base
+from models.domain import CoursePath, Section, Unit, Level, Lesson
 
-def patch_database():
-    print("Connecting to Render Database...")
-    with engine.connect() as conn:
-        try:
-            # Add the gems column
-            conn.execute(text("ALTER TABLE learner_profiles ADD COLUMN gems INTEGER DEFAULT 25;"))
-            print("✅ Successfully added 'gems' column!")
-        except Exception as e:
-            print("⚠️ 'gems' column might already exist or failed:", str(e).split('\n')[0])
-            
-        try:
-            # Add the last_gem_update column
-            conn.execute(text("ALTER TABLE learner_profiles ADD COLUMN last_gem_update TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;"))
-            print("✅ Successfully added 'last_gem_update' column!")
-        except Exception as e:
-            print("⚠️ 'last_gem_update' column might already exist or failed:", str(e).split('\n')[0])
-            
-        # Commit the changes to the database
-        conn.commit()
-    print("🎉 Database patching complete!")
+def init_tables():
+    print("Creating new Path Hierarchy tables...")
+    # This will create any missing tables without deleting existing ones
+    Base.metadata.create_all(bind=engine)
+    print("✅ Tables created successfully!")
 
 if __name__ == "__main__":
-    patch_database()
+    init_tables()

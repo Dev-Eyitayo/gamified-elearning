@@ -7,7 +7,7 @@ load_dotenv()
 
 # For local development, assuming a local Postgres instance
 # Make sure to create a database named 'gels_db' in your local Postgres
-SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://gels_pyrd_user:sSd1i9fVih4C8JoL0LPm3dePtjuXt1h3@dpg-d7tnhv57vvec73cldqlg-a.oregon-postgres.render.com/gels_pyrd")
+SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://gels_gq4e_user:foexLM26Thc9iIKs48e2hYubZ0HGgUIW@dpg-d7ui9bflk1mc73aejig0-a.oregon-postgres.render.com/gels_gq4e")
 
 engine = create_engine(SQLALCHEMY_DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
