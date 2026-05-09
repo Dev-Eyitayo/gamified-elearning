@@ -6,3 +6,26 @@ gels-backend/fix_db.py
 gels-backend/fix_leagues.py
 gels-backend/fix_db.py
 gels-backend/fix_leagues_db.py
+gels-backend/__pycache__/
+gels-backend/*.pyc
+
+
+**/__pycache__/
+*.pyc
+
+# Node/Frontend
+node_modules/
+.next/
+dist/
+build/
+.eslintcache
+
+# Python Virtual Environments
+.venv/
+venv/
+env/
+
+# OS/IDE files
+.DS_Store
+.vscode/
+.idea/
