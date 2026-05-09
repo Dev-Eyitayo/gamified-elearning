@@ -9,7 +9,8 @@ export default function ProfilePage() {
   
   // Dynamic States
   const [profileData, setProfileData] = useState<any>(null);
-  const [socialData, setSocialData] = useState<{friends: any[], feed: any[]}>({ friends: [], feed: [] });
+const [socialData, setSocialData] = useState<{following: any[], followers: any[], feed: any[]}>({ 
+following: [], followers: [], feed: [] });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -148,7 +149,7 @@ export default function ProfilePage() {
             <div className="border-2 border-slate-200 rounded-2xl p-4 flex items-center gap-4">
               <Flame size={28} strokeWidth={3} className="text-[#FF9600]" fill="currentColor" />
               <div>
-                <div className="text-xl font-black text-slate-700">{profileData?.streak_days || 0}</div>
+                <div className="text-xl font-black text-slate-700">{profileData?.streak_days || "wiating for streak data..."}</div>
                 <div className="text-sm font-bold text-slate-400">Day streak</div>
               </div>
             </div>
@@ -156,7 +157,7 @@ export default function ProfilePage() {
             <div className="border-2 border-slate-200 rounded-2xl p-4 flex items-center gap-4">
               <Zap size={28} strokeWidth={3} className="text-[#FFD900]" fill="currentColor" />
               <div>
-                <div className="text-xl font-black text-slate-700">{profileData?.xp_total?.toLocaleString() || 0}</div>
+                <div className="text-xl font-black text-slate-700">{profileData?.xp_total?.toLocaleString() || "wiating for XP data..."}</div>
                 <div className="text-sm font-bold text-slate-400">Total XP</div>
               </div>
             </div>
@@ -172,7 +173,7 @@ export default function ProfilePage() {
             <div className="border-2 border-slate-200 rounded-2xl p-4 flex items-center gap-4">
               <Medal size={28} strokeWidth={3} className="text-[#FF9600]" fill="currentColor" />
               <div>
-                <div className="text-xl font-black text-slate-700">{Math.floor((profileData?.xp_total || 0) / 5000)}</div>
+                <div className="text-xl font-black text-slate-700">{Math.floor((profileData?.xp_total || "wiating for League data...") / 5000)}</div>
                 <div className="text-sm font-bold text-slate-400">Top 3 finishes</div>
               </div>
             </div>

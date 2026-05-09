@@ -89,46 +89,42 @@ def get_curriculum_modules(db: Session = Depends(get_db)):
         for m in modules
     ]
 
-# gels-backend/api/learning.py
-
 @router.post("/submit-assessment")
 def submit_assessment(data: AssessmentSubmit, db: Session = Depends(get_db)):
     profile = db.query(LearnerProfile).filter(LearnerProfile.user_id == data.user_id).first()
     if not profile:
         raise HTTPException(status_code=404, detail="Profile not found")
 
-    # 1. Award XP & Sync Gems (Existing Logic)
+    # 1. Award XP and Sync Gems
     xp_gain = 15 + (5 if data.score >= 80 else 0)
     profile.xp_total += xp_gain
     profile.gems = data.remaining_gems
 
-    # 2. 🔥 STREAK LOGIC: Calculate date difference
+    # 2. 🔥 STREAK LOGIC
     now = datetime.now(timezone.utc)
-    
-    # Ensure timezone safety for the comparison
+
     last_active = profile.last_active_at
     if last_active and last_active.tzinfo is None:
         last_active = last_active.replace(tzinfo=timezone.utc)
 
     if last_active:
-        # Get only the date part to ignore specific hours/minutes
         delta = now.date() - last_active.date()
         
-        if delta.days == 1:
-            # Consistent! Yesterday was active, today is active.
+        if delta.days == 0:
+            # ✅ FIX: First lesson of the day - if streak is 0, this is effectively day 1
+            if profile.streak_days == 0:
+                profile.streak_days = 1
+            # else: already practiced today, keep streak as is
+        elif delta.days == 1:
             profile.streak_days += 1
         elif delta.days > 1:
-            # Missed a day. Reset to 1.
             profile.streak_days = 1
-        # if delta.days == 0, they already practiced today, keep current streak
     else:
-        # Brand new user's first lesson
         profile.streak_days = 1
 
-    # 3. Update the activity timestamp
     profile.last_active_at = now
     
-    db.commit() # 🔥 CRITICAL: Write both XP and Streak to disk
+    db.commit()
     return {"status": "success", "streak": profile.streak_days}
 
 @router.get("/next-module")

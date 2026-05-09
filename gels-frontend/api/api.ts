@@ -98,10 +98,10 @@ export const api = {
   // 2. LEARNING & ONBOARDING
   learning: {
     // Replace getAllPaths and add these under the `learning:` object
-  getAllPaths: (instructorId: string) => fetchAPI(`/learning/learning-paths?instructor_id=${instructorId}`, { method: 'GET' }),
-  createCourse: (data: any) => fetchAPI('/learning/course', { method: 'POST', body: JSON.stringify(data) }),
-  createSection: (data: any) => fetchAPI('/learning/section', { method: 'POST', body: JSON.stringify(data) }),
-  createUnit: (data: any) => fetchAPI('/learning/unit', { method: 'POST', body: JSON.stringify(data) }),
+    getAllPaths: (instructorId: string) => fetchAPI(`/learning/learning-paths?instructor_id=${instructorId}`, { method: 'GET' }),
+    createCourse: (data: any) => fetchAPI('/learning/course', { method: 'POST', body: JSON.stringify(data) }),
+    createSection: (data: any) => fetchAPI('/learning/section', { method: 'POST', body: JSON.stringify(data) }),
+    createUnit: (data: any) => fetchAPI('/learning/unit', { method: 'POST', body: JSON.stringify(data) }),
     getLesson: (moduleName: string, lessonId: string) => fetchAPI(`/learning/${moduleName}/${lessonId}?t=${new Date().getTime()}`, { method: 'GET' }),
     getOnboardingConfig: () => fetchAPI('/learning/onboarding-config', { method: 'GET' }),
     getQuestion: () => fetchAPI(`/learning/question?t=${new Date().getTime()}`, { method: 'GET' }),    
@@ -130,6 +130,9 @@ export const api = {
       const url = playerType ? `/gamification/leaderboard?scope=${scope}&player_type=${playerType}` : `/gamification/leaderboard?scope=${scope}`;
       return fetchAPI(url, { method: 'GET' });
     },
+    searchUsers: (query: string, userId: string) => fetchAPI(`/gamification/search-users?query=${query}&user_id=${userId}`, { method: 'GET' }),
+    followUser: (followerId: string, followingId: string) => fetchAPI(`/gamification/follow?follower_id=${followerId}&following_id=${followingId}`, { method: 'POST' }),
+    unfollowUser: (followerId: string, followingId: string) => fetchAPI(`/gamification/follow?follower_id=${followerId}&following_id=${followingId}`, { method: 'DELETE' }),
     getSocialData: (userId: string) => fetchAPI(`/gamification/social?user_id=${userId}`, { method: 'GET' }),
     getQuests: () => fetchAPI('/gamification/quests', { method: 'GET' }),
     getNotifications: (userId: string) => fetchAPI(`/gamification/notifications?user_id=${userId}`, { method: 'GET' }),

@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
 from core.database import get_db
-from models.domain import LearnerProfile, User, Quest, Achievement, Notification
+from models.domain import LearnerProfile, User, Quest, Achievement, Notification, UserFollow
 from datetime import datetime, timezone, timedelta
 
 router = APIRouter(prefix="/api/gamification", tags=["Affective Engine"])
@@ -160,38 +160,106 @@ def get_notifications(user_id: str, db: Session = Depends(get_db)):
 
 @router.get("/social")
 def get_social_data(user_id: str, db: Session = Depends(get_db)):
-    """Fetches cohort activity feed and friends with explicit join condition"""
-    
+    """Returns real following/followers + activity feed"""
     if user_id == "undefined" or not user_id:
-        return {"friends": [], "feed": []}
+        return {"friends": [], "followers": [], "feed": []}
 
-    # 🔥 FIX: Added explicit onclause
-    peers = db.query(User.email, LearnerProfile.xp_total)\
-        .join(LearnerProfile, User.user_id == LearnerProfile.user_id)\
-        .filter(User.user_id != user_id)\
-        .limit(4).all()
-    
-    friends_list = []
     colors = ["bg-[#58CC02]", "bg-[#CE82FF]", "bg-[#FF9600]", "bg-[#1CB0F6]"]
-    
-    for i, peer in enumerate(peers):
-        name = peer.email.split('@')[0].replace('.', ' ').title()
-        friends_list.append({
+
+    def build_friend(email, xp, index):
+        name = email.split('@')[0].replace('.', ' ').title()
+        return {
             "name": name,
-            "xp": f"{peer.xp_total} XP",
+            "xp": xp,
             "initials": name[:2].upper(),
-            "color": colors[i % len(colors)]
-        })
+            "color": colors[index % len(colors)]
+        }
 
+    # Who this user is following
+    following_rows = db.query(User.email, LearnerProfile.xp_total)\
+        .join(UserFollow, UserFollow.following_id == User.user_id)\
+        .join(LearnerProfile, LearnerProfile.user_id == User.user_id)\
+        .filter(UserFollow.follower_id == user_id).all()
+
+    following_list = [build_friend(r.email, r.xp_total, i) for i, r in enumerate(following_rows)]
+
+    # Who is following this user
+    followers_rows = db.query(User.email, LearnerProfile.xp_total)\
+        .join(UserFollow, UserFollow.follower_id == User.user_id)\
+        .join(LearnerProfile, LearnerProfile.user_id == User.user_id)\
+        .filter(UserFollow.following_id == user_id).all()
+
+    followers_list = [build_friend(r.email, r.xp_total, i) for i, r in enumerate(followers_rows)]
+
+    # Feed: top followed user's recent activity
     feed = []
-    if friends_list:
-        top_peer = friends_list[0]
+    if following_list:
+        top = following_list[0]
         feed.append({
-            "friend_name": top_peer["name"],
-            "friend_initials": top_peer["initials"],
-            "friend_color": top_peer["color"],
+            "friend_name": top["name"],
+            "friend_initials": top["initials"],
+            "friend_color": top["color"],
             "time_ago": "Recently",
-            "message": f"Just reached {top_peer['xp']} and is climbing the leaderboard!"
+            "message": f"Just hit {top['xp']} XP and is climbing the leaderboard!"
         })
 
-    return {"friends": friends_list, "feed": feed}
+    return {"following": following_list, "followers": followers_list, "feed": feed}
+
+@router.get("/search-users")
+def search_users(query: str, user_id: str, db: Session = Depends(get_db)):
+    """Search for users to follow by username"""
+    if not query or len(query) < 2:
+        return []
+    
+    results = db.query(User.user_id, User.email, LearnerProfile.xp_total)\
+        .join(LearnerProfile, LearnerProfile.user_id == User.user_id)\
+        .filter(User.email.ilike(f"%{query}%"))\
+        .filter(User.user_id != user_id)\
+        .limit(8).all()
+
+    # Check which ones the current user already follows
+    already_following = {
+        str(r.following_id) for r in 
+        db.query(UserFollow.following_id).filter(UserFollow.follower_id == user_id).all()
+    }
+
+    return [
+        {
+            "user_id": str(r.user_id),
+            "name": r.email.split('@')[0].replace('.', ' ').title(),
+            "email": r.email,
+            "xp": r.xp_total,
+            "is_following": str(r.user_id) in already_following
+        }
+        for r in results
+    ]
+
+@router.post("/follow")
+def follow_user(follower_id: str, following_id: str, db: Session = Depends(get_db)):
+    """Follow a user"""
+    existing = db.query(UserFollow).filter(
+        UserFollow.follower_id == follower_id,
+        UserFollow.following_id == following_id
+    ).first()
+
+    if existing:
+        raise HTTPException(status_code=400, detail="Already following")
+
+    db.add(UserFollow(follower_id=follower_id, following_id=following_id))
+    db.commit()
+    return {"status": "following"}
+
+@router.delete("/follow")
+def unfollow_user(follower_id: str, following_id: str, db: Session = Depends(get_db)):
+    """Unfollow a user"""
+    record = db.query(UserFollow).filter(
+        UserFollow.follower_id == follower_id,
+        UserFollow.following_id == following_id
+    ).first()
+
+    if not record:
+        raise HTTPException(status_code=404, detail="Not following")
+
+    db.delete(record)
+    db.commit()
+    return {"status": "unfollowed"}

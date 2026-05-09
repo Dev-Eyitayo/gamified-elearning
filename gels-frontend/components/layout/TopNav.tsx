@@ -19,8 +19,8 @@ useEffect(() => {
         
         if (profile) {
           setInitial(profile.username?.charAt(0).toUpperCase() || 'U');
-          // 🔥 SYNC STREAK STATE
-          setStreak(profile.streak_days || 0); 
+          // 🔥 SYNC: This replaces the "waiting..." text with the real number
+            setStreak(profile.streak_days ?? 0);
         }
       }
     } catch (e) {
